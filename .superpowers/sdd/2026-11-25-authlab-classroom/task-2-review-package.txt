@@ -1,0 +1,935 @@
+
+===== src/types/course.ts (new file) =====
+export type Level = 'certificate' | 'diploma';
+export type LessonId = 'overview' | 'installation' | 'setup' | 'database' | 'backend' | 'api' | 'frontend' | 'testing' | 'security' | 'devops';
+export interface LessonSummary {
+  id: LessonId;
+  order: number;
+  title: string;
+  shortTitle: string;
+  description: string;
+  durationMinutes: number;
+  level: Level;
+  outcomes: string[];
+  tags: string[];
+}
+export interface ProgressState {
+  version: 1;
+  level: Level;
+  completed: Record<Level, LessonId[]>;
+  quizScores: Partial<Record<Level, number>>;
+  lastLessonId?: LessonId;
+}
+
+
+===== src/data/course.ts (new file) =====
+import type { LessonId, LessonSummary, Level } from '../types/course';
+
+const coreLessons: Omit<LessonSummary, 'level'>[] = [
+  {
+    id: 'overview',
+    order: 1,
+    title: 'ภาพรวมระบบ Authentication',
+    shortTitle: 'ภาพรวม',
+    description:
+      'เข้าใจ flow ของ Register, Login และ Session รวมถึงบทบาทของ Frontend, Backend และฐานข้อมูลก่อนเริ่มลงมือ',
+    durationMinutes: 10,
+    outcomes: [
+      'อธิบาย flow ของการสมัครสมาชิกและเข้าสู่ระบบ',
+      'แยก responsibilities ของ Frontend, Backend และ Database',
+      'วางแผนเส้นทางสร้าง Authentication ที่เข้าใจง่าย',
+    ],
+    tags: ['Authentication', 'Flow'],
+  },
+  {
+    id: 'installation',
+    order: 2,
+    title: 'ติดตั้งเครื่องมือและตรวจสอบ Node.js',
+    shortTitle: 'ติดตั้ง',
+    description:
+      'ติดตั้ง Node.js, MySQL, HeidiSQL และ VS Code พร้อมตรวจสอบ environment เพื่อเตรียมเครื่องมือสำหรับ hands-on labs',
+    durationMinutes: 30,
+    outcomes: [
+      'ตรวจสอบ Node.js และ npm ผ่าน Terminal ได้',
+      'เชื่อมต่อ MySQL ด้วย HeidiSQL และสร้าง database สำหรับฝึกได้',
+      'เตรียม VS Code extensions และโปรเจกต์สำหรับ workshop ถัดไป',
+    ],
+    tags: ['Node.js', 'MySQL', 'Setup'],
+  },
+  {
+    id: 'setup',
+    order: 3,
+    title: 'จัดโครงโปรเจกต์และตั้งค่า Environment',
+    shortTitle: 'โครงโปรเจกต์',
+    description:
+      'จัดระเบียบไฟล์ Frontend และ Backend ตั้งค่า environment variables และทำความเข้าใจการเริ่ม server สำหรับพัฒนา',
+    durationMinutes: 25,
+    outcomes: [
+      'สร้างโครงโปรเจกต์ที่แยก Frontend และ Backend ชัดเจน',
+      'จัดการ configuration และ secrets ด้วย environment variables',
+      'เริ่ม development server และตรวจสอบ health endpoint พื้นฐาน',
+    ],
+    tags: ['Express', 'Environment', 'Project Structure'],
+  },
+  {
+    id: 'database',
+    order: 4,
+    title: 'ออกแบบตาราง users ด้วย MySQL',
+    shortTitle: 'Database',
+    description:
+      'เรียนรู้ data types, constraints และ SQL queries ที่จำเป็นสำหรับเก็บข้อมูลผู้ใช้ โดยไม่จัดเก็บ plaintext password',
+    durationMinutes: 35,
+    outcomes: [
+      'ออกแบบตาราง users พร้อม primary key และ unique constraints',
+      'เขียน SQL เพื่อสร้าง ตรวจสอบ และQuery ข้อมูลผู้ใช้',
+      'อธิบายเหตุผลที่ไม่ควรเก็บ plaintext password ใน database',
+    ],
+    tags: ['MySQL', 'SQL', 'Users'],
+  },
+  {
+    id: 'backend',
+    order: 5,
+    title: 'สร้าง Register และ Login ด้วย Express',
+    shortTitle: 'Backend',
+    description:
+      'สร้าง API สำหรับสมัครสมาชิกและเข้าสู่ระบบ แยก route, controller และ service พร้อม hash password ก่อนบันทึก',
+    durationMinutes: 40,
+    outcomes: [
+      'สร้าง Register และ Login endpoints ด้วย Express',
+      'ตรวจสอบ input และจัดการ error response ให้สม่ำเสมอ',
+      'Hash password ด้วย bcrypt และเปรียบเทียบผลลัพธ์เมื่อ Login',
+    ],
+    tags: ['Node.js', 'Express', 'bcrypt'],
+  },
+  {
+    id: 'api',
+    order: 6,
+    title: 'เชื่อมต่อ Frontend กับ REST API',
+    shortTitle: 'API',
+    description:
+      'ทำความเข้าใจ HTTP methods, status codes และ JSON จากนั้นเรียก Backend API จาก Vue 3 พร้อมจัดการสถานะ loading และ error',
+    durationMinutes: 35,
+    outcomes: [
+      'อธิบาย HTTP method, status code และรูปแบบ JSON ของ API',
+      'เรียก REST API จาก Vue 3 ด้วย Axios',
+      'จัดการ loading, success และ error states บนหน้าจอ',
+    ],
+    tags: ['REST API', 'Axios', 'JSON'],
+  },
+  {
+    id: 'frontend',
+    order: 7,
+    title: 'สร้างหน้าจอ Authentication ด้วย Vue 3',
+    shortTitle: 'Frontend',
+    description:
+      'ออกแบบหน้า Register และ Login ที่ใช้งานง่าย ตรวจสอบฟอร์มและเชื่อม authentication state เข้ากับ navigation',
+    durationMinutes: 45,
+    outcomes: [
+      'สร้างฟอร์ม Register และ Login พร้อม client-side validation',
+      'จัดการ authentication state และ navigation guard เบื้องต้น',
+      'ออกแบบ feedback ที่เข้าใจง่ายทั้งผู้ใช้และ screen reader',
+    ],
+    tags: ['Vue 3', 'Forms', 'Authentication'],
+  },
+  {
+    id: 'testing',
+    order: 8,
+    title: 'ทดสอบ Flow และ Validation',
+    shortTitle: 'Testing',
+    description:
+      'ทดสอบเส้นทาง Register ถึง Login ด้วย manual test cases และ unit tests เพื่อค้นพบปัญหา validation และ error handling',
+    durationMinutes: 30,
+    outcomes: [
+      'เขียน test cases สำหรับ happy path และ invalid inputs',
+      'ทดสอบ API พื้นฐานด้วย Vitest และ Supertest',
+      'ตรวจสอบว่า error messages ไม่เปิดเผยข้อมูลสำคัญ',
+    ],
+    tags: ['Testing', 'Validation', 'Vitest'],
+  },
+];
+
+const advancedLessons: Omit<LessonSummary, 'level'>[] = [
+  {
+    id: 'security',
+    order: 9,
+    title: 'ความปลอดภัยและ JWT Middleware',
+    shortTitle: 'Security',
+    description:
+      'เข้าใจ JWT lifecycle และออกแบบ authentication middleware พร้อมวิเคราะห์ security trade-offs ระหว่าง Session และ Token',
+    durationMinutes: 40,
+    outcomes: [
+      'ออกแบบ JWT middleware สำหรับปกป้อง private routes',
+      'เปรียบเทียบ security trade-offs ของ Session และ JWT',
+      'จัดการ token expiration, rotation และการป้องกัน attacks พื้นฐาน',
+    ],
+    tags: ['JWT', 'Middleware', 'Security'],
+  },
+  {
+    id: 'devops',
+    order: 10,
+    title: 'Docker และ CI/CD สำหรับ Authentication',
+    shortTitle: 'DevOps',
+    description:
+      'แพ็กเกจ Authentication services ด้วย Docker และออกแบบ CI/CD pipeline พร้อมการจัดการ secrets และ environment แยกตามสถานการณ์',
+    durationMinutes: 35,
+    outcomes: [
+      'สร้าง Docker image และ compose services สำหรับ Backend, Frontend และ MySQL',
+      'ออกแบบ CI/CD pipeline ที่รัน tests และตรวจสอบ build ก่อน deploy',
+      'แยก configuration และ secrets ตาม development, staging และ production',
+    ],
+    tags: ['Docker', 'CI/CD', 'Deployment'],
+  },
+];
+
+export const certificateLessons: LessonSummary[] = coreLessons.map((lesson) => ({
+  ...lesson,
+  level: 'certificate',
+}));
+
+export const diplomaLessons: LessonSummary[] = [
+  ...coreLessons.map((lesson) => ({
+    ...lesson,
+    level: 'diploma' as const,
+  })),
+  ...advancedLessons.map((lesson) => ({
+    ...lesson,
+    level: 'diploma' as const,
+  })),
+];
+
+export function getLessonsForLevel(level: Level): LessonSummary[] {
+  return level === 'diploma' ? diplomaLessons : certificateLessons;
+}
+
+export function getLessonSummary(level: Level, id: LessonId): LessonSummary | undefined {
+  return getLessonsForLevel(level).find((lesson) => lesson.id === id);
+}
+
+
+===== src/lib/progress.ts (new file) =====
+import { getLessonsForLevel } from '../data/course';
+import type { LessonId, Level, ProgressState } from '../types/course';
+
+const STORAGE_KEY = 'auth-classroom:progress:v1';
+const LEVELS: Level[] = ['certificate', 'diploma'];
+
+function createDefaultProgress(): ProgressState {
+  return {
+    version: 1,
+    level: 'certificate',
+    completed: {
+      certificate: [],
+      diploma: [],
+    },
+    quizScores: {},
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isLevel(value: unknown): value is Level {
+  return value === 'certificate' || value === 'diploma';
+}
+
+function normalizeCompleted(level: Level, value: unknown): LessonId[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const allowedIds = new Set(getLessonsForLevel(level).map((lesson) => lesson.id));
+  const seen = new Set<LessonId>();
+  const completed: LessonId[] = [];
+
+  for (const id of value) {
+    if (typeof id !== 'string') {
+      continue;
+    }
+
+    const lessonId = id as LessonId;
+    if (!allowedIds.has(lessonId) || seen.has(lessonId)) {
+      continue;
+    }
+
+    seen.add(lessonId);
+    completed.push(lessonId);
+  }
+
+  return completed;
+}
+
+function normalizeQuizScores(value: unknown): Partial<Record<Level, number>> {
+  if (!isRecord(value)) {
+    return {};
+  }
+
+  const quizScores: Partial<Record<Level, number>> = {};
+
+  for (const level of LEVELS) {
+    const score = value[level];
+    if (
+      typeof score === 'number' &&
+      Number.isInteger(score) &&
+      score >= 0 &&
+      score <= 5
+    ) {
+      quizScores[level] = score;
+    }
+  }
+
+  return quizScores;
+}
+
+function normalizeProgress(value: unknown): ProgressState {
+  if (!isRecord(value) || value.version !== 1 || !isLevel(value.level)) {
+    return createDefaultProgress();
+  }
+
+  const completedInput = isRecord(value.completed) ? value.completed : {};
+  const completed = {
+    certificate: normalizeCompleted('certificate', completedInput.certificate),
+    diploma: normalizeCompleted('diploma', completedInput.diploma),
+  };
+  const progress: ProgressState = {
+    version: 1,
+    level: value.level,
+    completed,
+    quizScores: normalizeQuizScores(value.quizScores),
+  };
+  const allowedLastLessonIds = new Set(
+    getLessonsForLevel(value.level).map((lesson) => lesson.id),
+  );
+
+  if (
+    typeof value.lastLessonId === 'string' &&
+    allowedLastLessonIds.has(value.lastLessonId as LessonId)
+  ) {
+    progress.lastLessonId = value.lastLessonId as LessonId;
+  }
+
+  return progress;
+}
+
+export function readProgress(): ProgressState {
+  if (typeof window === 'undefined') {
+    return createDefaultProgress();
+  }
+
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    return stored ? normalizeProgress(JSON.parse(stored)) : createDefaultProgress();
+  } catch {
+    return createDefaultProgress();
+  }
+}
+
+export function saveProgress(next: ProgressState): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizeProgress(next)));
+  } catch {
+    // Storage can be unavailable in private browsing or when its quota is exceeded.
+  }
+}
+
+export function resetProgress(): ProgressState {
+  const progress = createDefaultProgress();
+  saveProgress(progress);
+  return progress;
+}
+
+export function toggleLesson(
+  state: ProgressState,
+  id: LessonId,
+  level: Level,
+): ProgressState {
+  const lessons = getLessonsForLevel(level);
+  if (!lessons.some((lesson) => lesson.id === id)) {
+    throw new Error(`Unknown lesson "${id}" for ${level} level.`);
+  }
+
+  const completedForLevel = state.completed[level];
+  const isCompleted = completedForLevel.includes(id);
+  const completed = isCompleted
+    ? completedForLevel.filter((lessonId) => lessonId !== id)
+    : [...completedForLevel, id];
+
+  return {
+    ...state,
+    level,
+    completed: {
+      ...state.completed,
+      [level]: completed,
+    },
+    lastLessonId: id,
+  };
+}
+
+export function recordQuiz(
+  state: ProgressState,
+  level: Level,
+  score: number,
+): ProgressState {
+  const integerScore = Number.isNaN(score) ? 0 : Math.trunc(score);
+  const clampedScore = Math.max(0, Math.min(5, integerScore));
+
+  return {
+    ...state,
+    level,
+    quizScores: {
+      ...state.quizScores,
+      [level]: clampedScore,
+    },
+  };
+}
+
+
+===== src/hooks/useProgress.ts (new file) =====
+import { useCallback, useEffect, useState } from 'react';
+import {
+  readProgress,
+  recordQuiz as recordQuizProgress,
+  resetProgress,
+  saveProgress,
+  toggleLesson as toggleLessonProgress,
+} from '../lib/progress';
+import type { LessonId, Level, ProgressState } from '../types/course';
+
+export function useProgress() {
+  const [progress, setProgress] = useState<ProgressState>(() => readProgress());
+
+  useEffect(() => {
+    saveProgress(progress);
+  }, [progress]);
+
+  const setLevel = useCallback((level: Level) => {
+    setProgress((current) => ({
+      ...current,
+      level,
+    }));
+  }, []);
+
+  const toggleLesson = useCallback((id: LessonId, level: Level) => {
+    setProgress((current) => toggleLessonProgress(current, id, level));
+  }, []);
+
+  const recordQuiz = useCallback((level: Level, score: number) => {
+    setProgress((current) => recordQuizProgress(current, level, score));
+  }, []);
+
+  const reset = useCallback(() => {
+    setProgress(resetProgress());
+  }, []);
+
+  return {
+    progress,
+    level: progress.level,
+    setLevel,
+    toggleLesson,
+    recordQuiz,
+    reset,
+  };
+}
+
+
+===== src/components/LevelSwitcher.tsx (new file) =====
+import type { Level } from '../types/course';
+
+export interface LevelSwitcherProps {
+  level: Level;
+  onChange: (level: Level) => void;
+}
+
+const levels: { value: Level; label: string }[] = [
+  { value: 'certificate', label: 'ปวช.' },
+  { value: 'diploma', label: 'ปวส.' },
+];
+
+export function LevelSwitcher({ level, onChange }: LevelSwitcherProps) {
+  return (
+    <div
+      role="group"
+      aria-label="เลือกระดับการศึกษา"
+      className="inline-flex rounded-xl border border-line bg-canvas p-1"
+    >
+      {levels.map((option) => {
+        const isSelected = option.value === level;
+
+        return (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={isSelected}
+            onClick={() => onChange(option.value)}
+            className={`min-h-10 rounded-lg px-4 text-sm font-semibold transition-colors ${
+              isSelected
+                ? 'bg-ink text-surface shadow-sm'
+                : 'text-muted hover:bg-surface hover:text-ink'
+            }`}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+
+===== src/components/ProgressBar.tsx (new file) =====
+import type { LessonId, LessonSummary } from '../types/course';
+
+export interface ProgressBarProps {
+  lessons: LessonSummary[];
+  completed: LessonId[];
+}
+
+export function ProgressBar({ lessons, completed }: ProgressBarProps) {
+  const completedIds = new Set(completed);
+  const completedCount = lessons.filter((lesson) => completedIds.has(lesson.id)).length;
+  const percentage =
+    lessons.length === 0 ? 0 : Math.round((completedCount / lessons.length) * 100);
+  const valueText = `ทำเสร็จแล้ว ${completedCount} จาก ${lessons.length} บท (${percentage}%)`;
+
+  return (
+    <div className="w-full">
+      <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+        <span className="font-semibold text-ink">ความคืบหน้า</span>
+        <span className="text-muted">
+          {completedCount}/{lessons.length} บท · {percentage}%
+        </span>
+      </div>
+      <div
+        role="progressbar"
+        aria-label="ความคืบหน้า"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percentage}
+        aria-valuetext={valueText}
+        className="h-2.5 overflow-hidden rounded-full bg-line"
+      >
+        <div
+          className="h-full rounded-full bg-brand transition-[width] duration-300"
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+
+===== src/lib/progress.test.ts (new file) =====
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  certificateLessons,
+  diplomaLessons,
+  getLessonSummary,
+  getLessonsForLevel,
+} from '../data/course';
+import type { LessonId, ProgressState } from '../types/course';
+import {
+  readProgress,
+  recordQuiz,
+  resetProgress,
+  saveProgress,
+  toggleLesson,
+} from './progress';
+
+const STORAGE_KEY = 'auth-classroom:progress:v1';
+
+function defaultProgress(): ProgressState {
+  return {
+    version: 1,
+    level: 'certificate',
+    completed: {
+      certificate: [],
+      diploma: [],
+    },
+    quizScores: {},
+  };
+}
+
+beforeEach(() => {
+  localStorage.clear();
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  localStorage.clear();
+});
+
+describe('course catalog', () => {
+  it('provides the exact certificate and diploma lesson order', () => {
+    const certificateIds: LessonId[] = [
+      'overview',
+      'installation',
+      'setup',
+      'database',
+      'backend',
+      'api',
+      'frontend',
+      'testing',
+    ];
+    const diplomaIds: LessonId[] = [...certificateIds, 'security', 'devops'];
+
+    expect(certificateLessons.map((lesson) => lesson.id)).toEqual(certificateIds);
+    expect(diplomaLessons.map((lesson) => lesson.id)).toEqual(diplomaIds);
+    expect(certificateLessons).toHaveLength(8);
+    expect(diplomaLessons).toHaveLength(10);
+  });
+
+  it('exposes level-specific summaries with useful Thai learning outcomes', () => {
+    for (const level of ['certificate', 'diploma'] as const) {
+      const lessons = getLessonsForLevel(level);
+
+      expect(lessons.every((lesson) => lesson.level === level)).toBe(true);
+      expect(lessons.map((lesson) => lesson.order)).toEqual(
+        lessons.map((_, index) => index + 1),
+      );
+      expect(
+        lessons.every(
+          (lesson) =>
+            Number.isInteger(lesson.durationMinutes) &&
+            lesson.durationMinutes >= 10 &&
+            lesson.durationMinutes <= 45,
+        ),
+      ).toBe(true);
+      expect(
+        lessons.every(
+          (lesson) =>
+            /[\u0E00-\u0E7F]/.test(lesson.title) &&
+            /[\u0E00-\u0E7F]/.test(lesson.description) &&
+            lesson.outcomes.length > 0 &&
+            lesson.outcomes.every((outcome) => /[\u0E00-\u0E7F]/.test(outcome)) &&
+            lesson.tags.length > 0,
+        ),
+      ).toBe(true);
+    }
+
+    expect(getLessonSummary('certificate', 'api')?.outcomes.join(' ')).toContain('API');
+    expect(getLessonSummary('diploma', 'security')?.outcomes.join(' ')).toContain('JWT');
+    expect(getLessonSummary('diploma', 'devops')?.outcomes.join(' ')).toContain('Docker');
+    expect(getLessonSummary('diploma', 'devops')?.outcomes.join(' ')).toContain('CI/CD');
+    expect(getLessonSummary('certificate', 'security')).toBeUndefined();
+  });
+});
+
+describe('progress store', () => {
+  it('reads a fresh default state when storage is empty', () => {
+    expect(readProgress()).toEqual(defaultProgress());
+  });
+
+  it('saves and reads a complete progress state', () => {
+    const state: ProgressState = {
+      version: 1,
+      level: 'diploma',
+      completed: {
+        certificate: ['overview', 'api'],
+        diploma: ['setup', 'security'],
+      },
+      quizScores: {
+        certificate: 4,
+        diploma: 5,
+      },
+      lastLessonId: 'security',
+    };
+
+    saveProgress(state);
+
+    expect(readProgress()).toEqual(state);
+  });
+
+  it('toggles a lesson idempotently without changing the other level', () => {
+    const state: ProgressState = {
+      ...defaultProgress(),
+      completed: {
+        certificate: ['overview'],
+        diploma: ['database'],
+      },
+    };
+
+    const completed = toggleLesson(state, 'installation', 'certificate');
+    const toggledOff = toggleLesson(completed, 'installation', 'certificate');
+
+    expect(completed).not.toBe(state);
+    expect(completed.completed.certificate).toEqual(['overview', 'installation']);
+    expect(completed.completed.diploma).toEqual(['database']);
+    expect(completed.lastLessonId).toBe('installation');
+    expect(toggledOff.completed.certificate).toEqual(['overview']);
+    expect(toggledOff.completed.diploma).toEqual(['database']);
+    expect(state.completed.certificate).toEqual(['overview']);
+  });
+
+  it('rejects an unknown lesson ID', () => {
+    expect(() => toggleLesson(defaultProgress(), 'unknown' as LessonId, 'certificate')).toThrow(
+      /unknown lesson/i,
+    );
+  });
+
+  it('rejects a lesson that does not belong to the selected level', () => {
+    expect(() => toggleLesson(defaultProgress(), 'security', 'certificate')).toThrow(
+      /certificate/i,
+    );
+  });
+
+  it('clamps truncated quiz scores to the 0–5 range per level', () => {
+    const high = recordQuiz(defaultProgress(), 'certificate', 8.9);
+    const low = recordQuiz(high, 'certificate', -3.2);
+    const roundedDown = recordQuiz(low, 'certificate', 3.9);
+    const diploma = recordQuiz(roundedDown, 'diploma', 4.8);
+
+    expect(high.quizScores.certificate).toBe(5);
+    expect(low.quizScores.certificate).toBe(0);
+    expect(roundedDown.quizScores.certificate).toBe(3);
+    expect(diploma.quizScores).toEqual({
+      certificate: 3,
+      diploma: 4,
+    });
+    expect(diploma.level).toBe('diploma');
+  });
+
+  it('falls back to defaults for malformed JSON', () => {
+    localStorage.setItem(STORAGE_KEY, '{not-json');
+
+    expect(readProgress()).toEqual(defaultProgress());
+  });
+
+  it('falls back to defaults for an invalid stored level', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...defaultProgress(),
+        level: 'advanced',
+        completed: {
+          certificate: ['overview'],
+          diploma: [],
+        },
+      }),
+    );
+
+    expect(readProgress()).toEqual(defaultProgress());
+  });
+
+  it('normalizes duplicate IDs, unknown IDs, and non-array completion data', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        level: 'diploma',
+        completed: {
+          certificate: ['overview', 'overview', 'security', 'unknown'],
+          diploma: 'database',
+        },
+        quizScores: {
+          certificate: 4,
+        },
+        lastLessonId: 'api',
+      }),
+    );
+
+    expect(readProgress()).toEqual({
+      version: 1,
+      level: 'diploma',
+      completed: {
+        certificate: ['overview'],
+        diploma: [],
+      },
+      quizScores: {
+        certificate: 4,
+      },
+      lastLessonId: 'api',
+    });
+  });
+
+  it('drops invalid stored quiz scores and lesson references', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...defaultProgress(),
+        quizScores: {
+          certificate: 9,
+          diploma: 2.5,
+        },
+        lastLessonId: 'security',
+      }),
+    );
+
+    expect(readProgress()).toEqual(defaultProgress());
+  });
+
+  it('returns defaults and clears persisted progress on reset', () => {
+    saveProgress({
+      ...defaultProgress(),
+      level: 'diploma',
+      completed: {
+        certificate: ['overview'],
+        diploma: ['security'],
+      },
+      quizScores: {
+        diploma: 5,
+      },
+    });
+
+    const reset = resetProgress();
+
+    expect(reset).toEqual(defaultProgress());
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null')).toEqual(defaultProgress());
+    expect(readProgress()).toEqual(defaultProgress());
+  });
+
+  it('guards calls when browser storage is unavailable', () => {
+    vi.stubGlobal('window', undefined);
+
+    try {
+      expect(readProgress()).toEqual(defaultProgress());
+      expect(() => saveProgress(defaultProgress())).not.toThrow();
+      expect(resetProgress()).toEqual(defaultProgress());
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('guards localStorage access errors', () => {
+    const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('storage denied');
+    });
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('storage denied');
+    });
+
+    try {
+      expect(readProgress()).toEqual(defaultProgress());
+      expect(() => saveProgress(defaultProgress())).not.toThrow();
+      expect(() => resetProgress()).not.toThrow();
+    } finally {
+      getItem.mockRestore();
+      setItem.mockRestore();
+    }
+  });
+});
+
+
+===== src/components/LevelSwitcher.test.tsx (new file) =====
+import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useProgress } from '../hooks/useProgress';
+import { readProgress, saveProgress } from '../lib/progress';
+import type { ProgressState } from '../types/course';
+import { LevelSwitcher } from './LevelSwitcher';
+
+beforeEach(() => {
+  localStorage.clear();
+});
+
+describe('LevelSwitcher', () => {
+  it('renders the exact track labels with accessible selected state', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <LevelSwitcher level="certificate" onChange={onChange} />,
+    );
+
+    const certificate = screen.getByRole('button', { name: 'ปวช.' });
+    const diploma = screen.getByRole('button', { name: 'ปวส.' });
+
+    expect(certificate).toHaveAttribute('aria-pressed', 'true');
+    expect(certificate).toHaveClass('bg-ink', 'text-surface');
+    expect(diploma).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(diploma);
+
+    expect(onChange).toHaveBeenCalledWith('diploma');
+
+    rerender(<LevelSwitcher level="diploma" onChange={onChange} />);
+
+    expect(certificate).toHaveAttribute('aria-pressed', 'false');
+    expect(diploma).toHaveAttribute('aria-pressed', 'true');
+    expect(diploma).toHaveClass('bg-ink', 'text-surface');
+  });
+
+  it('switches the persisted level without clearing either track progress', () => {
+    const initial: ProgressState = {
+      version: 1,
+      level: 'certificate',
+      completed: {
+        certificate: ['overview', 'api'],
+        diploma: ['security'],
+      },
+      quizScores: {
+        certificate: 4,
+        diploma: 5,
+      },
+      lastLessonId: 'api',
+    };
+    saveProgress(initial);
+
+    function ProgressHarness() {
+      const { level, setLevel } = useProgress();
+
+      return <LevelSwitcher level={level} onChange={setLevel} />;
+    }
+
+    render(<ProgressHarness />);
+    fireEvent.click(screen.getByRole('button', { name: 'ปวส.' }));
+
+    expect(screen.getByRole('button', { name: 'ปวส.' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(readProgress()).toEqual({
+      ...initial,
+      level: 'diploma',
+    });
+  });
+});
+
+
+===== src/components/ProgressBar.test.tsx (new file) =====
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+import { getLessonsForLevel } from '../data/course';
+import type { LessonId } from '../types/course';
+import { ProgressBar } from './ProgressBar';
+
+describe('ProgressBar', () => {
+  it('exposes an accessible Thai progressbar with a rounded integer percentage', () => {
+    const lessons = getLessonsForLevel('certificate').slice(0, 3);
+
+    render(<ProgressBar lessons={lessons} completed={['overview']} />);
+
+    const progressbar = screen.getByRole('progressbar', { name: 'ความคืบหน้า' });
+    expect(progressbar).toHaveAttribute('aria-valuemin', '0');
+    expect(progressbar).toHaveAttribute('aria-valuemax', '100');
+    expect(progressbar).toHaveAttribute('aria-valuenow', '33');
+    expect(progressbar).toHaveAttribute('aria-valuetext', 'ทำเสร็จแล้ว 1 จาก 3 บท (33%)');
+  });
+
+  it('counts each matching lesson once and ignores IDs outside the course', () => {
+    const lessons = getLessonsForLevel('certificate');
+    const completed: LessonId[] = [
+      'overview',
+      'overview',
+      'security',
+      'unknown' as LessonId,
+    ];
+
+    render(<ProgressBar lessons={lessons} completed={completed} />);
+
+    expect(screen.getByRole('progressbar', { name: 'ความคืบหน้า' })).toHaveAttribute(
+      'aria-valuenow',
+      '13',
+    );
+  });
+
+  it('reports zero rather than NaN for an empty lesson list', () => {
+    render(<ProgressBar lessons={[]} completed={[]} />);
+
+    expect(screen.getByRole('progressbar', { name: 'ความคืบหน้า' })).toHaveAttribute(
+      'aria-valuenow',
+      '0',
+    );
+  });
+});

@@ -9,8 +9,7 @@ import {
   ShieldCheck,
   Terminal,
 } from 'lucide-react';
-import { useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ContinueCard, getContinueSelection } from '../components/ContinueCard';
 import { LessonCard } from '../components/LessonCard';
 import { LevelSwitcher } from '../components/LevelSwitcher';
@@ -59,7 +58,6 @@ const trackNames = {
 
 export function Dashboard() {
   const { level, setLevel, progress } = useClassroomProgress();
-  const location = useLocation();
   const lessons = getLessonsForLevel(level);
   const completed = progress.completed[level];
   const completedIds = new Set(completed);
@@ -73,12 +71,6 @@ export function Dashboard() {
   );
   const quizScore = progress.quizScores[level];
   const continueSelection = getContinueSelection(lessons, completed);
-
-  useEffect(() => {
-    if (location.hash === '#course-map') {
-      document.getElementById('course-map')?.scrollIntoView?.({ block: 'start' });
-    }
-  }, [location.hash]);
 
   return (
     <>

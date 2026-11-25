@@ -1,0 +1,1564 @@
+Task 3 changes against completed Task 2. App.tsx and useProgress.ts modified; all other files new.
+
+===== src/App.tsx (current file) =====
+import { ArrowLeft, Construction } from 'lucide-react';
+import { HashRouter, Link, Navigate, Route, Routes } from 'react-router-dom';
+import { AppShell } from './components/AppShell';
+import { ProgressProvider } from './context/ProgressContext';
+import { Dashboard } from './pages/Dashboard';
+import { LessonPage } from './pages/LessonPage';
+
+interface ComingNextProps {
+  title: string;
+  description: string;
+}
+
+function ComingNext({ title, description }: ComingNextProps) {
+  return (
+    <section className="mx-auto flex min-h-[70vh] max-w-3xl items-center px-5 py-16 sm:px-8">
+      <div className="w-full rounded-[1.75rem] border border-line bg-surface p-7 text-center shadow-[0_24px_70px_-45px_rgba(23,34,59,0.55)] sm:p-10">
+        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-soft-coral text-coral">
+          <Construction aria-hidden="true" className="h-6 w-6" strokeWidth={1.8} />
+        </span>
+        <p className="mt-6 text-[10px] font-semibold tracking-[0.2em] text-brand">
+          COMING NEXT
+        </p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">
+          {title}
+        </h1>
+        <p className="mx-auto mt-5 max-w-xl text-sm leading-7 text-muted sm:text-base">
+          {description}
+        </p>
+        <p className="mt-4 text-sm leading-7 text-muted">
+          กำลังเตรียมพื้นที่ทดลองเพื่อเชื่อมต่อกับหลักสูตรในขั้นถัดไป
+        </p>
+        <Link
+          to="/#course-map"
+          className="mt-7 inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-line bg-canvas px-5 py-3 text-sm font-semibold text-ink transition-colors hover:border-brand/30 hover:text-brand"
+        >
+          <ArrowLeft aria-hidden="true" className="h-4 w-4" />
+          กลับไปยังแผนภูมิหลักสูตร
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+export function renderApp() {
+  return (
+    <HashRouter>
+      <ProgressProvider>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route index element={<Dashboard />} />
+            <Route path="/lesson/:lessonId" element={<LessonPage />} />
+            <Route
+              path="/practice"
+              element={
+                <ComingNext
+                  title="ฝึกท้ายบทAuthentication"
+                  description="พื้นที่สำหรับแบบฝึกหัดและคำถามสรุปหลังเรียน เพื่อตรวจสอบความเข้าใจก่อนพัฒนาระบบ Authentication ของคุณ"
+                />
+              }
+            />
+            <Route
+              path="/demo"
+              element={
+                <ComingNext
+                  title="Authentication Demo"
+                  description="พื้นที่สำหรับทดลองการสมัครสมาชิก เข้าสู่ระบบ และดู flow ของ Authentication ในเบราว์เซอร์"
+                />
+              }
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
+        </Routes>
+      </ProgressProvider>
+    </HashRouter>
+  );
+}
+
+export default function App() {
+  return renderApp();
+}
+
+
+===== src/hooks/useProgress.ts (current file) =====
+import { useCallback, useEffect, useState } from 'react';
+import {
+  readProgress,
+  recordQuiz as recordQuizProgress,
+  resetProgress,
+  saveProgress,
+  toggleLesson as toggleLessonProgress,
+} from '../lib/progress';
+import type { LessonId, Level, ProgressState } from '../types/course';
+
+export function useProgress() {
+  const [progress, setProgress] = useState<ProgressState>(() => readProgress());
+
+  useEffect(() => {
+    saveProgress(progress);
+  }, [progress]);
+
+  const setLevel = useCallback((level: Level) => {
+    setProgress((current) => ({
+      ...current,
+      level,
+    }));
+  }, []);
+
+  const toggleLesson = useCallback((id: LessonId, level: Level) => {
+    setProgress((current) => toggleLessonProgress(current, id, level));
+  }, []);
+
+  const visitLesson = useCallback((id: LessonId) => {
+    setProgress((current) =>
+      current.lastLessonId === id ? current : { ...current, lastLessonId: id },
+    );
+  }, []);
+
+  const recordQuiz = useCallback((level: Level, score: number) => {
+    setProgress((current) => recordQuizProgress(current, level, score));
+  }, []);
+
+  const reset = useCallback(() => {
+    setProgress(resetProgress());
+  }, []);
+
+  return {
+    progress,
+    level: progress.level,
+    setLevel,
+    toggleLesson,
+    visitLesson,
+    recordQuiz,
+    reset,
+  };
+}
+
+
+===== src/context/ProgressContext.tsx (current file) =====
+import { createContext, useContext } from 'react';
+import type { PropsWithChildren } from 'react';
+import { useProgress } from '../hooks/useProgress';
+
+type ClassroomProgress = ReturnType<typeof useProgress>;
+
+const ProgressContext = createContext<ClassroomProgress | undefined>(undefined);
+
+export function ProgressProvider({ children }: PropsWithChildren) {
+  const progress = useProgress();
+
+  return <ProgressContext.Provider value={progress}>{children}</ProgressContext.Provider>;
+}
+
+export function useClassroomProgress(): ClassroomProgress {
+  const progress = useContext(ProgressContext);
+
+  if (!progress) {
+    throw new Error('useClassroomProgress must be used within a ProgressProvider.');
+  }
+
+  return progress;
+}
+
+
+===== src/components/AppShell.tsx (current file) =====
+import {
+  ArrowRight,
+  BookOpen,
+  ClipboardCheck,
+  LayoutDashboard,
+  ShieldCheck,
+} from 'lucide-react';
+import type { MouseEvent } from 'react';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { getContinueSelection } from './ContinueCard';
+import { useClassroomProgress } from '../context/ProgressContext';
+import { getLessonsForLevel } from '../data/course';
+import type { Level } from '../types/course';
+
+const navigation = [
+  { to: '/', label: 'หน้าหลัก', icon: LayoutDashboard },
+  { to: '/practice', label: 'ฝึกท้ายบท', icon: ClipboardCheck },
+  { to: '/demo', label: 'Authentication Demo', icon: ShieldCheck },
+] as const;
+
+const levelLabels: Record<Level, string> = {
+  certificate: 'ปวช.',
+  diploma: 'ปวส.',
+};
+
+function skipToContent(event: MouseEvent<HTMLAnchorElement>) {
+  event.preventDefault();
+
+  const main = document.getElementById('main-content');
+  main?.focus();
+  main?.scrollIntoView({ block: 'start' });
+}
+
+export function AppShell() {
+  const { level, progress } = useClassroomProgress();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const lessons = getLessonsForLevel(level);
+  const completedCount = progress.completed[level].length;
+  const continueSelection = getContinueSelection(lessons, progress.completed[level]);
+
+  return (
+    <div className="relative isolate min-h-screen overflow-x-hidden bg-canvas font-sans text-ink">
+      <div
+        aria-hidden="true"
+        className="classroom-grid pointer-events-none absolute inset-x-0 top-0 -z-10 h-[680px] opacity-55"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-32 top-28 -z-10 h-96 w-96 rounded-full bg-brand/10 blur-3xl"
+      />
+
+      <a
+        href="#main-content"
+        onClick={skipToContent}
+        className="fixed left-4 top-4 z-50 -translate-y-24 rounded-xl bg-ink px-4 py-3 text-sm font-semibold text-surface shadow-xl transition-transform focus:translate-y-0"
+      >
+        ข้ามไปยังเนื้อหา
+      </a>
+
+      <aside className="sticky top-0 z-40 border-b border-line/80 bg-surface/95 backdrop-blur-xl lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:h-screen lg:w-72 lg:flex-col lg:border-b-0 lg:border-r">
+        <div className="flex h-20 shrink-0 items-center justify-between gap-3 border-b border-line/80 px-5 sm:px-6">
+          <Link
+            to="/"
+            className="inline-flex min-w-0 items-center gap-3 rounded-xl"
+            aria-label="AuthLab หน้าแรก"
+          >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-ink text-surface shadow-sm">
+              <BookOpen aria-hidden="true" className="h-5 w-5" strokeWidth={1.8} />
+            </span>
+            <span className="text-xl font-bold tracking-[-0.03em]">AuthLab</span>
+            <span className="hidden rounded-full border border-line px-2.5 py-1 text-[10px] font-semibold tracking-[0.16em] text-muted sm:inline">
+              CLASSROOM
+            </span>
+          </Link>
+
+          {continueSelection && (
+            <button
+              type="button"
+              onClick={() => navigate(`/lesson/${continueSelection.lesson.id}`)}
+              className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl bg-brand px-3.5 text-xs font-semibold text-white transition-colors hover:bg-brand-deep lg:hidden"
+            >
+              เริ่มเรียน
+              <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
+        <nav
+          aria-label="นำทางหลัก"
+          className="flex gap-2 overflow-x-auto border-b border-line/80 p-3 sm:px-5 lg:shrink-0 lg:flex-col lg:overflow-visible lg:border-b-0 lg:px-4 lg:py-6"
+        >
+          {navigation.map((item) => {
+            const Icon = item.icon;
+            const active =
+              item.to === '/'
+                ? location.pathname === '/' || location.pathname.startsWith('/lesson/')
+                : location.pathname.startsWith(item.to);
+
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                aria-current={active ? 'page' : undefined}
+                className={`inline-flex min-h-11 shrink-0 items-center gap-3 rounded-xl px-3.5 text-sm font-medium transition-colors lg:w-full ${
+                  active
+                    ? 'bg-soft-brand font-semibold text-brand'
+                    : 'text-muted hover:bg-canvas hover:text-ink'
+                }`}
+              >
+                <Icon aria-hidden="true" className="h-4 w-4" strokeWidth={1.8} />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="hidden min-h-0 flex-1 flex-col lg:flex">
+          <div className="mx-5 mt-2 rounded-2xl border border-line bg-canvas p-4">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-semibold text-ink">เส้นทางปัจจุบัน</span>
+              <span className="rounded-full bg-surface px-2.5 py-1 font-mono text-[11px] font-semibold text-brand">
+                {levelLabels[level]}
+              </span>
+            </div>
+            <p className="mt-4 text-xs leading-6 text-muted">
+              เสร็จแล้ว {completedCount} จาก {lessons.length} บท
+            </p>
+            <div
+              aria-hidden="true"
+              className="mt-3 h-1.5 overflow-hidden rounded-full bg-line"
+            >
+              <div
+                className="h-full rounded-full bg-brand"
+                style={{
+                  width: `${Math.round((completedCount / lessons.length) * 100)}%`,
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="mx-5 mt-auto mb-6 hidden items-center gap-2.5 text-xs font-medium text-muted lg:flex">
+            <span aria-hidden="true" className="h-2 w-2 rounded-full bg-coral" />
+            เรียนรู้ แล้วลงมือทำ
+          </div>
+        </div>
+      </aside>
+
+      <div className="lg:pl-72">
+        <main id="main-content" tabIndex={-1} className="focus:outline-none">
+          <Outlet />
+        </main>
+
+        <footer className="border-t border-line bg-surface">
+          <div className="mx-auto flex max-w-7xl flex-col gap-2 px-5 py-7 text-xs text-muted sm:flex-row sm:items-center sm:justify-between sm:px-8">
+            <span className="font-semibold text-ink">AuthLab Classroom</span>
+            <span>ห้องเรียน Authentication สำหรับนักศึกษา ปวช. และ ปวส.</span>
+          </div>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+
+===== src/components/LessonCard.tsx (current file) =====
+import { Check, Clock3 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import type { LessonSummary } from '../types/course';
+
+export interface LessonCardProps {
+  lesson: LessonSummary;
+  completed: boolean;
+}
+
+export function LessonCard({ lesson, completed }: LessonCardProps) {
+  return (
+    <li className="relative pl-12 sm:pl-14">
+      <span
+        aria-hidden="true"
+        className={`absolute left-0 top-6 z-10 flex h-10 w-10 items-center justify-center rounded-full border-4 border-canvas font-mono text-xs font-semibold shadow-sm sm:h-11 sm:w-11 ${
+          completed
+            ? 'bg-brand text-white'
+            : 'bg-surface text-brand'
+        }`}
+      >
+        {completed ? <Check className="h-4 w-4" strokeWidth={2.5} /> : String(lesson.order).padStart(2, '0')}
+      </span>
+
+      <Link
+        to={`/lesson/${lesson.id}`}
+        className="group block rounded-2xl border border-line bg-surface p-5 shadow-[0_12px_35px_-30px_rgba(23,34,59,0.55)] transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-brand/35 hover:shadow-[0_18px_40px_-30px_rgba(79,70,229,0.45)] sm:p-6"
+      >
+        <article>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="font-mono text-[11px] font-semibold tracking-[0.12em] text-brand">
+              บทที่ {String(lesson.order).padStart(2, '0')}
+            </p>
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                completed ? 'bg-soft-brand text-brand' : 'bg-canvas text-muted'
+              }`}
+            >
+              {completed && <Check aria-hidden="true" className="h-3.5 w-3.5" />}
+              {completed ? 'เสร็จแล้ว' : 'ยังไม่เริ่ม'}
+            </span>
+          </div>
+
+          <h3 className="mt-3 text-base font-semibold leading-7 tracking-[-0.015em] text-ink group-hover:text-brand sm:text-lg">
+            {lesson.title}
+          </h3>
+          <p className="mt-2 text-sm leading-7 text-muted">{lesson.description}</p>
+
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-canvas px-2.5 py-1.5 text-xs font-medium text-muted">
+              <Clock3 aria-hidden="true" className="h-3.5 w-3.5" />
+              {lesson.durationMinutes} นาที
+            </span>
+            {lesson.tags.map((tag) => (
+              <span
+                key={tag}
+                className="rounded-lg border border-line px-2.5 py-1.5 font-mono text-[11px] font-medium text-muted"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        </article>
+      </Link>
+    </li>
+  );
+}
+
+
+===== src/components/ContinueCard.tsx (current file) =====
+import { ArrowRight, BookOpenCheck, Clock3 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { useClassroomProgress } from '../context/ProgressContext';
+import type { LessonId, LessonSummary } from '../types/course';
+
+export interface ContinueSelection {
+  lesson: LessonSummary;
+  label: 'เริ่มบทแรก' | 'เรียนต่อ' | 'ทบทวนบทสุดท้าย';
+}
+
+export function getContinueSelection(
+  lessons: LessonSummary[],
+  completed: LessonId[],
+): ContinueSelection | undefined {
+  const finalLesson = lessons.at(-1);
+  if (!finalLesson) {
+    return undefined;
+  }
+
+  const completedIds = new Set(completed);
+  const allComplete = lessons.every((lesson) => completedIds.has(lesson.id));
+  const lesson =
+    lessons.find((candidate) => !completedIds.has(candidate.id)) ?? finalLesson;
+
+  if (allComplete) {
+    return { lesson: finalLesson, label: 'ทบทวนบทสุดท้าย' };
+  }
+
+  return {
+    lesson,
+    label: completed.length === 0 ? 'เริ่มบทแรก' : 'เรียนต่อ',
+  };
+}
+
+export interface ContinueCardProps {
+  lessons: LessonSummary[];
+}
+
+export function ContinueCard({ lessons }: ContinueCardProps) {
+  const { level, progress } = useClassroomProgress();
+  const completed = progress.completed[level];
+  const selection = getContinueSelection(lessons, completed);
+
+  if (!selection) {
+    return null;
+  }
+
+  return (
+    <section
+      aria-labelledby="continue-title"
+      className="relative overflow-hidden rounded-[1.75rem] bg-ink p-6 text-white shadow-[0_24px_60px_-32px_rgba(23,34,59,0.7)] sm:p-7"
+    >
+      <div
+        aria-hidden="true"
+        className="absolute -right-14 -top-16 h-44 w-44 rounded-full bg-brand/35 blur-3xl"
+      />
+      <div className="relative">
+        <div className="flex items-center gap-3">
+          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-coral">
+            <BookOpenCheck aria-hidden="true" className="h-5 w-5" strokeWidth={1.8} />
+          </span>
+          <div>
+            <p className="text-[10px] font-semibold tracking-[0.18em] text-white/55">
+              YOUR NEXT STEP
+            </p>
+            <h2 id="continue-title" className="mt-1 text-lg font-semibold">
+              เส้นทางถัดไปของคุณ
+            </h2>
+          </div>
+        </div>
+
+        <p className="mt-6 text-xl font-semibold leading-8 tracking-[-0.02em]">
+          {selection.lesson.title}
+        </p>
+        <p className="mt-2 flex items-center gap-2 text-sm text-white/65">
+          <Clock3 aria-hidden="true" className="h-4 w-4" />
+          บทที่ {selection.lesson.order} · {selection.lesson.durationMinutes} นาที
+        </p>
+
+        <Link
+          to={`/lesson/${selection.lesson.id}`}
+          className="group mt-6 inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-xl bg-coral px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#e85f50] focus-visible:outline-white sm:w-auto"
+        >
+          {selection.label}
+          <ArrowRight
+            aria-hidden="true"
+            className="h-4 w-4 transition-transform group-hover:translate-x-0.5"
+          />
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+
+===== src/pages/Dashboard.tsx (current file) =====
+import {
+  ArrowRight,
+  BookMarked,
+  Braces,
+  Check,
+  Code2,
+  Database,
+  Layers3,
+  ShieldCheck,
+  Terminal,
+} from 'lucide-react';
+import { useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { ContinueCard, getContinueSelection } from '../components/ContinueCard';
+import { LessonCard } from '../components/LessonCard';
+import { LevelSwitcher } from '../components/LevelSwitcher';
+import { ProgressBar } from '../components/ProgressBar';
+import { useClassroomProgress } from '../context/ProgressContext';
+import { getLessonsForLevel } from '../data/course';
+
+const learningSteps = [
+  { title: 'เข้าใจ Flow', detail: 'Login, Register และ Session' },
+  { title: 'สร้าง Backend', detail: 'Express, API และ MySQL' },
+  { title: 'เชื่อม Frontend', detail: 'หน้าจอและ Authentication ด้วย Vue 3' },
+  { title: 'ตรวจสอบความปลอดภัย', detail: 'Validation, Password และ JWT' },
+] as const;
+
+const overviewCards = [
+  {
+    icon: Braces,
+    title: 'Frontend ที่เข้าใจผู้ใช้',
+    description:
+      'ออกแบบหน้า Login และ Register ที่ใช้งานง่าย เชื่อมข้อมูลกับ API และจัดการสถานะการเข้าสู่ระบบ',
+    tag: 'Vue 3',
+    tone: 'bg-soft-brand text-brand',
+  },
+  {
+    icon: Database,
+    title: 'Backend ที่มีโครงสร้าง',
+    description:
+      'เรียนรู้การจัดเก็บผู้ใช้ การตรวจสอบข้อมูล และการสร้าง API ด้วย Node.js, Express และ MySQL',
+    tag: 'Node.js + Express',
+    tone: 'bg-soft-coral text-coral',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Authentication ที่เป็นระบบ',
+    description:
+      'เข้าใจ Session และ JWT จากแนวคิดจนถึงการป้องกันข้อผิดพลาดทางความปลอดภัยพื้นฐาน',
+    tag: 'Security',
+    tone: 'bg-[#edf7f3] text-[#287a5b]',
+  },
+] as const;
+
+const trackNames = {
+  certificate: 'ประกาศนียบัตรวิชาชีพ (ปวช.)',
+  diploma: 'ประกาศนียบัตรวิชาชีพชั้นสูง (ปวส.)',
+} as const;
+
+export function Dashboard() {
+  const { level, setLevel, progress } = useClassroomProgress();
+  const location = useLocation();
+  const lessons = getLessonsForLevel(level);
+  const completed = progress.completed[level];
+  const completedIds = new Set(completed);
+  const completedCount = lessons.filter((lesson) => completedIds.has(lesson.id)).length;
+  const percentage = Math.round((completedCount / lessons.length) * 100);
+  const totalMinutes = lessons.reduce((total, lesson) => total + lesson.durationMinutes, 0);
+  const remainingMinutes = lessons.reduce(
+    (total, lesson) =>
+      completedIds.has(lesson.id) ? total : total + lesson.durationMinutes,
+    0,
+  );
+  const quizScore = progress.quizScores[level];
+  const continueSelection = getContinueSelection(lessons, completed);
+
+  useEffect(() => {
+    if (location.hash === '#course-map') {
+      document.getElementById('course-map')?.scrollIntoView?.({ block: 'start' });
+    }
+  }, [location.hash]);
+
+  return (
+    <>
+      <section
+        aria-labelledby="hero-title"
+        className="mx-auto grid max-w-7xl items-center gap-14 px-5 py-14 sm:px-8 sm:py-20 lg:grid-cols-[1.12fr_0.88fr] lg:gap-16 lg:py-24"
+      >
+        <div>
+          <div className="inline-flex items-center gap-2.5 rounded-full border border-line bg-surface px-3.5 py-2 text-xs font-medium text-muted shadow-sm">
+            <span aria-hidden="true" className="h-2 w-2 rounded-full bg-coral" />
+            ห้องเรียน Authentication สำหรับนักศึกษา
+          </div>
+
+          <h1
+            id="hero-title"
+            className="mt-7 max-w-3xl text-4xl font-semibold leading-[1.2] tracking-[-0.04em] sm:text-5xl lg:text-[3.65rem]"
+          >
+            เข้าใจ <span className="text-brand">Login</span> และ{' '}
+            <span className="text-brand">Register</span>
+            <br className="hidden sm:block" /> จากพื้นฐานจนสู่ระบบที่ใช้งานจริง
+          </h1>
+
+          <p className="mt-6 max-w-2xl text-base leading-8 text-muted sm:text-lg">
+            เรียนรู้การสร้างระบบเข้าสู่ระบบแบบเป็นขั้นตอน ตั้งแต่โครงสร้าง Frontend,
+            Backend และฐานข้อมูล ไปจนถึงความปลอดภัย พร้อมคำอธิบายโค้ดทุกบรรทัด
+          </p>
+
+          <div className="mt-9 flex flex-col items-start gap-5 sm:flex-row sm:items-center">
+            <Link
+              to={`/lesson/${continueSelection?.lesson.id ?? 'overview'}`}
+              className="group inline-flex min-h-12 items-center justify-center gap-3 rounded-xl bg-brand px-6 py-3 text-sm font-semibold text-white shadow-[0_14px_32px_-14px_rgba(79,70,229,0.8)] transition-colors hover:bg-brand-deep"
+            >
+              เริ่มเรียน
+              <ArrowRight
+                aria-hidden="true"
+                className="h-4 w-4 transition-transform group-hover:translate-x-0.5"
+              />
+            </Link>
+
+            <Link
+              to="/demo"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-line bg-surface px-5 py-3 text-sm font-semibold text-ink transition-colors hover:border-brand/30 hover:text-brand"
+            >
+              <ShieldCheck aria-hidden="true" className="h-4 w-4 text-[#287a5b]" />
+              ดู Demo Authentication
+            </Link>
+          </div>
+
+          <dl className="mt-11 grid gap-5 border-t border-line pt-7 sm:grid-cols-3">
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-soft-brand text-brand">
+                <Layers3 aria-hidden="true" className="h-4 w-4" />
+              </span>
+              <div>
+                <dt className="text-sm font-semibold">แยก ปวช. / ปวส.</dt>
+                <dd className="mt-1 text-xs leading-5 text-muted">เลือกเส้นทางที่เหมาะ</dd>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-soft-coral text-coral">
+                <Code2 aria-hidden="true" className="h-4 w-4" />
+              </span>
+              <div>
+                <dt className="text-sm font-semibold">อธิบายทุกบรรทัด</dt>
+                <dd className="mt-1 text-xs leading-5 text-muted">เข้าใจโค้ดที่อ่าน</dd>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#edf7f3] text-[#287a5b]">
+                <Check aria-hidden="true" className="h-4 w-4" />
+              </span>
+              <div>
+                <dt className="text-sm font-semibold">ฝึกทำและทดลอง</dt>
+                <dd className="mt-1 text-xs leading-5 text-muted">เรียนรู้จากการลงมือ</dd>
+              </div>
+            </div>
+          </dl>
+        </div>
+
+        <aside
+          aria-labelledby="learning-path-title"
+          className="preview-shadow relative overflow-hidden rounded-[1.75rem] border border-white bg-surface p-6 sm:p-8"
+        >
+          <div
+            aria-hidden="true"
+            className="absolute -right-12 -top-12 h-36 w-36 rounded-full bg-coral/10 blur-2xl"
+          />
+          <div className="relative flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-ink text-surface">
+                <Terminal aria-hidden="true" className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="text-[10px] font-semibold tracking-[0.18em] text-muted">
+                  LEARNING PATH
+                </p>
+                <p className="mt-1 text-sm font-semibold">เส้นทางเรียนรู้</p>
+              </div>
+            </div>
+            <span className="font-mono text-xs text-muted">
+              01—{String(lessons.length).padStart(2, '0')}
+            </span>
+          </div>
+
+          <h2
+            id="learning-path-title"
+            className="relative mt-8 text-2xl font-semibold leading-snug tracking-[-0.025em]"
+          >
+            จากหน้าจอ Login
+            <br />
+            สู่ระบบ Authentication
+          </h2>
+
+          <ol className="relative mt-8 space-y-6">
+            {learningSteps.map((step, index) => (
+              <li key={step.title} className="relative flex gap-4">
+                {index < learningSteps.length - 1 && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute left-[17px] top-9 h-[calc(100%+0.25rem)] w-px bg-line"
+                  />
+                )}
+                <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line bg-canvas font-mono text-xs font-semibold text-brand">
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+                <div className="pt-0.5">
+                  <h3 className="text-sm font-semibold">{step.title}</h3>
+                  <p className="mt-1 text-xs leading-5 text-muted">{step.detail}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+
+          <div
+            aria-hidden="true"
+            className="mt-8 flex items-center justify-between rounded-xl bg-ink px-4 py-3.5 font-mono text-[11px] text-white/85"
+          >
+            <span>POST /api/register</span>
+            <span className="flex items-center gap-1.5 text-emerald-300">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
+              200 OK
+            </span>
+          </div>
+        </aside>
+      </section>
+
+      <section
+        aria-labelledby="overview-title"
+        className="border-t border-line/80 bg-surface/60"
+      >
+        <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20">
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+            <div>
+              <p className="text-[10px] font-semibold tracking-[0.2em] text-brand">
+                COURSE OVERVIEW
+              </p>
+              <h2
+                id="overview-title"
+                className="mt-3 text-2xl font-semibold tracking-[-0.03em] sm:text-3xl"
+              >
+                เรียนรู้เป็นขั้นเรียน แล้วจึงลงมือสร้าง
+              </h2>
+            </div>
+            <p className="font-mono text-xs text-muted">Concept → Practice → Demo</p>
+          </div>
+
+          <div className="mt-10 grid gap-5 md:grid-cols-3">
+            {overviewCards.map((card) => {
+              const Icon = card.icon;
+
+              return (
+                <article
+                  key={card.title}
+                  className="rounded-2xl border border-line bg-surface p-6 shadow-[0_10px_35px_-28px_rgba(23,34,59,0.45)] transition-transform duration-200 hover:-translate-y-1"
+                >
+                  <span
+                    className={`flex h-11 w-11 items-center justify-center rounded-2xl ${card.tone}`}
+                  >
+                    <Icon aria-hidden="true" className="h-5 w-5" strokeWidth={1.8} />
+                  </span>
+                  <h3 className="mt-6 text-base font-semibold">{card.title}</h3>
+                  <p className="mt-3 text-sm leading-7 text-muted">{card.description}</p>
+                  <span className="mt-6 inline-flex rounded-lg border border-line bg-canvas px-2.5 py-1.5 font-mono text-[11px] font-medium text-muted">
+                    {card.tag}
+                  </span>
+                </article>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section
+        aria-labelledby="classroom-title"
+        className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-20"
+      >
+        <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+          <div>
+            <p className="text-[10px] font-semibold tracking-[0.2em] text-brand">
+              YOUR CLASSROOM
+            </p>
+            <h2
+              id="classroom-title"
+              className="mt-3 text-2xl font-semibold tracking-[-0.03em] sm:text-3xl"
+            >
+              ความคืบหน้าและเส้นทางของคุณ
+            </h2>
+            <p className="mt-2 text-sm text-muted">{trackNames[level]}</p>
+          </div>
+          <LevelSwitcher level={level} onChange={setLevel} />
+        </div>
+
+        <div className="mt-8 grid items-stretch gap-5 lg:grid-cols-[1.15fr_0.85fr]">
+          <section
+            aria-labelledby="progress-summary-title"
+            className="rounded-[1.75rem] border border-line bg-surface p-6 shadow-[0_18px_50px_-38px_rgba(23,34,59,0.5)] sm:p-7"
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-semibold tracking-[0.18em] text-muted">
+                  PROGRESS SUMMARY
+                </p>
+                <h3
+                  id="progress-summary-title"
+                  className="mt-2 text-xl font-semibold tracking-[-0.02em]"
+                >
+                  สรุปความคืบหน้า
+                </h3>
+              </div>
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-soft-brand text-brand">
+                <BookMarked aria-hidden="true" className="h-5 w-5" strokeWidth={1.8} />
+              </span>
+            </div>
+
+            <div className="mt-7">
+              <ProgressBar lessons={lessons} completed={completed} />
+            </div>
+
+            <dl className="mt-7 grid grid-cols-2 gap-x-5 gap-y-6 border-t border-line pt-6 sm:grid-cols-4">
+              <div>
+                <dt className="text-xs text-muted">บทที่เสร็จแล้ว</dt>
+                <dd className="mt-2 text-lg font-semibold text-ink">
+                  {completedCount}/{lessons.length} บท
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted">ร้อยละของหลักสูตร</dt>
+                <dd className="mt-2 text-lg font-semibold text-brand">{percentage}%</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted">เวลาที่เหลือโดยประมาณ</dt>
+                <dd className="mt-2 text-lg font-semibold text-ink">
+                  {remainingMinutes} นาที
+                </dd>
+                <p className="mt-1 text-[11px] text-muted">จากทั้งหมด {totalMinutes} นาที</p>
+              </div>
+              {quizScore !== undefined && (
+                <div>
+                  <dt className="text-xs text-muted">คะแนนแบบฝึกหัด</dt>
+                  <dd className="mt-2 text-lg font-semibold text-ink">{quizScore}/5</dd>
+                </div>
+              )}
+            </dl>
+          </section>
+
+          <ContinueCard lessons={lessons} />
+        </div>
+
+        <section aria-labelledby="course-map-title" className="mt-16 sm:mt-20">
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+            <div>
+              <p className="text-[10px] font-semibold tracking-[0.2em] text-brand">
+                COURSE MAP
+              </p>
+              <h2
+                id="course-map-title"
+                className="mt-3 text-2xl font-semibold tracking-[-0.03em] sm:text-3xl"
+              >
+                แผนภูมิหลักสูตร
+              </h2>
+              <p className="mt-2 text-sm leading-7 text-muted">
+                เปิดบทเรียนตามลำดับ และทำเครื่องหมายความคืบหน้าเมื่อพร้อมไปต่อ
+              </p>
+            </div>
+            <p className="font-mono text-xs text-muted">{lessons.length} lessons</p>
+          </div>
+
+          <ol
+            id="course-map"
+            tabIndex={-1}
+            aria-label="ลำดับบทเรียนในหลักสูตร"
+            className="relative mt-9 scroll-mt-28 space-y-4 before:absolute before:bottom-6 before:left-[19px] before:top-6 before:w-px before:bg-line focus:outline-none sm:before:left-[21px]"
+          >
+            {lessons.map((lesson) => (
+              <LessonCard
+                key={lesson.id}
+                lesson={lesson}
+                completed={completedIds.has(lesson.id)}
+              />
+            ))}
+          </ol>
+        </section>
+
+        <aside
+          aria-labelledby="reference-title"
+          className="mt-12 rounded-2xl border border-line bg-surface/80 p-5 sm:flex sm:items-start sm:gap-4 sm:p-6"
+        >
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-soft-coral text-coral">
+            <BookMarked aria-hidden="true" className="h-5 w-5" strokeWidth={1.8} />
+          </span>
+          <div className="mt-4 sm:mt-0">
+            <h2 id="reference-title" className="text-sm font-semibold text-ink">
+              รากฐานการเรียนรู้และการแข่งขัน
+            </h2>
+            <p className="mt-2 text-sm leading-7 text-muted">
+              อ้างอิง ACFROG 57 และ competition list 58 เป็นพื้นฐานสำหรับจัดรูปแบบการเรียนรู้และเลือกทักษะที่ควรฝึก
+            </p>
+            <p className="mt-1 text-sm leading-7 text-muted">
+              หลักสูตรนี้เน้น Authentication และไม่แทนที่ระบบการแข่งขันทั้งหมด
+            </p>
+          </div>
+        </aside>
+      </section>
+    </>
+  );
+}
+
+
+===== src/pages/LessonPage.tsx (current file) =====
+import {
+  ArrowLeft,
+  ArrowRight,
+  BookOpenCheck,
+  Check,
+  CheckCircle2,
+  Clock3,
+  ListChecks,
+} from 'lucide-react';
+import { useEffect } from 'react';
+import { Link, Navigate, useParams } from 'react-router-dom';
+import { useClassroomProgress } from '../context/ProgressContext';
+import { getLessonsForLevel, getLessonSummary } from '../data/course';
+import type { LessonId } from '../types/course';
+
+export function LessonPage() {
+  const { lessonId } = useParams();
+  const { level, progress, toggleLesson, visitLesson } = useClassroomProgress();
+  const lessons = getLessonsForLevel(level);
+  const lesson = getLessonSummary(level, lessonId as LessonId);
+
+  useEffect(() => {
+    if (lesson) {
+      visitLesson(lesson.id);
+    }
+  }, [lesson, visitLesson]);
+
+  if (!lesson) {
+    return <Navigate to="/" replace />;
+  }
+
+  const currentIndex = lessons.findIndex((candidate) => candidate.id === lesson.id);
+  const previousLesson = lessons[currentIndex - 1];
+  const nextLesson = lessons[currentIndex + 1];
+  const completed = progress.completed[level].includes(lesson.id);
+  const levelLabel = level === 'diploma' ? 'หลักสูตรปวส.' : 'หลักสูตรปวช.';
+
+  return (
+    <div className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-12">
+      <nav aria-label="เส้นทางนำทาง" className="text-sm">
+        <ol className="flex flex-wrap items-center gap-2 text-muted">
+          <li>
+            <Link
+              to="/#course-map"
+              className="inline-flex min-h-10 items-center gap-2 rounded-lg font-medium hover:text-brand"
+            >
+              <ArrowLeft aria-hidden="true" className="h-4 w-4" />
+              กลับไปยังแผนภูมิหลักสูตร
+            </Link>
+          </li>
+          <li aria-hidden="true" className="text-line">
+            /
+          </li>
+          <li aria-current="page" className="font-medium text-ink">
+            {lesson.shortTitle}
+          </li>
+        </ol>
+      </nav>
+
+      <header className="mt-7 rounded-[1.75rem] border border-line bg-surface p-6 shadow-[0_20px_55px_-42px_rgba(23,34,59,0.55)] sm:p-8">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <span className="rounded-full bg-soft-brand px-3 py-1.5 text-xs font-semibold text-brand">
+            {levelLabel}
+          </span>
+          <span className="rounded-full border border-line bg-canvas px-3 py-1.5 font-mono text-xs font-semibold text-muted">
+            บทที่ {lesson.order}
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-canvas px-3 py-1.5 text-xs font-medium text-muted">
+            <Clock3 aria-hidden="true" className="h-3.5 w-3.5" />
+            <span>{lesson.durationMinutes} นาที</span>
+          </span>
+        </div>
+
+        <h1 className="mt-6 max-w-4xl text-3xl font-semibold leading-tight tracking-[-0.035em] sm:text-4xl">
+          {lesson.title}
+        </h1>
+        <p className="mt-5 max-w-3xl text-base leading-8 text-muted">
+          {lesson.description}
+        </p>
+        <div className="mt-6 flex flex-wrap gap-2">
+          {lesson.tags.map((tag) => (
+            <span
+              key={tag}
+              className="rounded-lg border border-line bg-canvas px-2.5 py-1.5 font-mono text-[11px] font-medium text-muted"
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+      </header>
+
+      <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <aside className="order-first rounded-2xl border border-line bg-surface p-5 lg:order-last lg:sticky lg:top-28">
+          <div className="flex items-center gap-2">
+            <ListChecks aria-hidden="true" className="h-4 w-4 text-brand" />
+            <h2 className="text-sm font-semibold">ลำดับบทเรียน</h2>
+          </div>
+          <nav aria-label="ลำดับบทเรียน" className="mt-4">
+            <ol className="space-y-1">
+              {lessons.map((outlineLesson) => {
+                const isCurrent = outlineLesson.id === lesson.id;
+                const isCompleted = progress.completed[level].includes(outlineLesson.id);
+
+                return (
+                  <li key={outlineLesson.id}>
+                    <Link
+                      to={`/lesson/${outlineLesson.id}`}
+                      aria-current={isCurrent ? 'page' : undefined}
+                      className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors ${
+                        isCurrent
+                          ? 'bg-soft-brand font-semibold text-brand'
+                          : 'text-muted hover:bg-canvas hover:text-ink'
+                      }`}
+                    >
+                      <span className="w-5 shrink-0 font-mono text-[11px]">
+                        {String(outlineLesson.order).padStart(2, '0')}.
+                      </span>
+                      <span className="min-w-0 flex-1">{outlineLesson.shortTitle}</span>
+                      {isCompleted && (
+                        <Check
+                          aria-hidden="true"
+                          className="h-4 w-4 shrink-0 text-brand"
+                        />
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ol>
+          </nav>
+        </aside>
+
+        <div className="order-last min-w-0 space-y-6 lg:order-first">
+          <section
+            aria-labelledby="outcomes-title"
+            className="rounded-2xl border border-line bg-surface p-6 sm:p-7"
+          >
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-soft-brand text-brand">
+                <BookOpenCheck aria-hidden="true" className="h-5 w-5" strokeWidth={1.8} />
+              </span>
+              <div>
+                <p className="text-[10px] font-semibold tracking-[0.18em] text-muted">
+                  LEARNING OUTCOMES
+                </p>
+                <h2 id="outcomes-title" className="mt-1 text-lg font-semibold">
+                  ผลลัพธ์การเรียนรู้
+                </h2>
+              </div>
+            </div>
+            <ul aria-label="ผลลัพธ์การเรียนรู้" className="mt-6 space-y-3">
+              {lesson.outcomes.map((outcome) => (
+                <li key={outcome} className="flex items-start gap-3 text-sm leading-7 text-ink">
+                  <CheckCircle2
+                    aria-hidden="true"
+                    className="mt-1 h-4 w-4 shrink-0 text-brand"
+                  />
+                  {outcome}
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section
+            id="lesson-content"
+            aria-labelledby="lesson-content-title"
+            className="scroll-mt-28 rounded-2xl border border-line bg-surface p-6 sm:p-8"
+          >
+            <p className="text-[10px] font-semibold tracking-[0.18em] text-brand">
+              LESSON CONTENT
+            </p>
+            <h2 id="lesson-content-title" className="mt-2 text-2xl font-semibold tracking-[-0.025em]">
+              เนื้อหาบทเรียน
+            </h2>
+            <div className="mt-5 rounded-2xl border border-dashed border-brand/25 bg-soft-brand/45 p-5">
+              <p className="text-sm leading-7 text-muted">
+                กำลังเตรียมเนื้อหาอธิบายและตัวอย่างสำหรับบทเรียนนี้
+                เพื่อเชื่อมโยงแนวคิดเข้ากับขั้นตอนการปฏิบัติและจุดตรวจความเข้าใจ
+              </p>
+            </div>
+          </section>
+
+          <section
+            id="lesson-checkpoint"
+            aria-labelledby="lesson-checkpoint-title"
+            className="scroll-mt-28 rounded-2xl border border-line bg-surface p-6 sm:p-8"
+          >
+            <p className="text-[10px] font-semibold tracking-[0.18em] text-coral">
+              CHECKPOINT
+            </p>
+            <h2 id="lesson-checkpoint-title" className="mt-2 text-2xl font-semibold tracking-[-0.025em]">
+              จุดตรวจความเข้าใจ
+            </h2>
+            <p className="mt-4 text-sm leading-7 text-muted">
+              บทเรียนนี้จะเชื่อมต่อกับแบบฝึกหัดและคำถามสรุป เพื่อช่วยตรวจสอบว่าคุณเข้าใจแนวคิดสำคัญก่อนไปต่อบทถัดไป
+            </p>
+          </section>
+
+          <section
+            aria-labelledby="completion-title"
+            className="rounded-2xl border border-line bg-surface p-6"
+          >
+            <h2 id="completion-title" className="text-base font-semibold">
+              บันทึกความคืบหน้า
+            </h2>
+            <p className="mt-2 text-sm leading-7 text-muted">
+              {completed
+                ? 'คุณทำเครื่องหมายบทเรียนนี้ว่าเสร็จแล้ว'
+                : 'ทำเครื่องหมายเมื่อเข้าใจเนื้อหาและพร้อมไปต่อบทถัดไป'}
+            </p>
+            <button
+              type="button"
+              aria-pressed={completed}
+              onClick={() => toggleLesson(lesson.id, level)}
+              className={`mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition-colors sm:w-auto ${
+                completed
+                  ? 'border border-line bg-surface text-ink hover:bg-canvas'
+                  : 'bg-brand text-white hover:bg-brand-deep'
+              }`}
+            >
+              {completed ? (
+                <Check aria-hidden="true" className="h-4 w-4" />
+              ) : (
+                <CheckCircle2 aria-hidden="true" className="h-4 w-4" />
+              )}
+              {completed ? 'ยกเลิกเครื่องหมายความคืบหน้า' : 'ทำเครื่องหมายว่าครบแล้ว'}
+            </button>
+          </section>
+
+          <nav
+            aria-label="การนำทางระหว่างบทเรียน"
+            className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+          >
+            {previousLesson ? (
+              <Link
+                to={`/lesson/${previousLesson.id}`}
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-line bg-surface px-5 py-3 text-sm font-semibold text-ink transition-colors hover:border-brand/30 hover:text-brand"
+              >
+                <ArrowLeft aria-hidden="true" className="h-4 w-4" />
+                บทก่อนหน้า: {previousLesson.shortTitle}
+              </Link>
+            ) : (
+              <Link
+                to="/#course-map"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-line bg-surface px-5 py-3 text-sm font-semibold text-ink transition-colors hover:border-brand/30 hover:text-brand"
+              >
+                <ArrowLeft aria-hidden="true" className="h-4 w-4" />
+                กลับไปยังแผนภูมิหลักสูตร
+              </Link>
+            )}
+
+            {nextLesson ? (
+              <Link
+                to={`/lesson/${nextLesson.id}`}
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-ink px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-deep"
+              >
+                บทถัดไป: {nextLesson.shortTitle}
+                <ArrowRight aria-hidden="true" className="h-4 w-4" />
+              </Link>
+            ) : (
+              <Link
+                to="/practice"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-ink px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-deep"
+              >
+                ไปยังฝึกท้ายบท
+                <ArrowRight aria-hidden="true" className="h-4 w-4" />
+              </Link>
+            )}
+          </nav>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+===== src/pages/Dashboard.test.tsx (current file) =====
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { renderApp } from '../App';
+import { useClassroomProgress } from '../context/ProgressContext';
+import { certificateLessons } from '../data/course';
+import { readProgress, saveProgress } from '../lib/progress';
+
+function renderAt(path = '/') {
+  window.location.hash = `#${path}`;
+  return render(renderApp());
+}
+
+function courseMap() {
+  const element = document.getElementById('course-map');
+  if (!element) {
+    throw new Error('Course map was not rendered.');
+  }
+  return within(element);
+}
+
+beforeEach(() => {
+  localStorage.clear();
+  window.location.hash = '#/';
+});
+
+afterEach(() => {
+  window.location.hash = '#/';
+  localStorage.clear();
+});
+
+describe('Dashboard', () => {
+  it('requires the shared progress provider', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    function OutsideProvider() {
+      useClassroomProgress();
+      return null;
+    }
+
+    try {
+      expect(() => render(<OutsideProvider />)).toThrow(
+        'useClassroomProgress must be used within a ProgressProvider.',
+      );
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it('shows the eight certificate lessons and the preserved hero by default', () => {
+    renderAt();
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      'Login และ Register',
+    );
+    expect(screen.getByRole('link', { name: 'เริ่มเรียน' })).toHaveAttribute(
+      'href',
+      '#/lesson/overview',
+    );
+    expect(screen.getByRole('link', { name: /ดู Demo Authentication/i })).toHaveAttribute(
+      'href',
+      '#/demo',
+    );
+    expect(screen.getByRole('button', { name: 'ปวช.' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(courseMap().getAllByRole('listitem')).toHaveLength(8);
+    expect(courseMap().getByText('ภาพรวมระบบ Authentication')).toBeVisible();
+    expect(courseMap().getByText('ทดสอบ Flow และ Validation')).toBeVisible();
+    expect(courseMap().queryByText('Docker และ CI/CD สำหรับ Authentication')).toBeNull();
+  });
+
+  it('switches to the ten-lesson diploma track without clearing progress', () => {
+    saveProgress({
+      version: 1,
+      level: 'certificate',
+      completed: {
+        certificate: ['overview'],
+        diploma: ['security'],
+      },
+      quizScores: {},
+    });
+    renderAt();
+
+    fireEvent.click(screen.getByRole('button', { name: 'ปวส.' }));
+
+    expect(courseMap().getAllByRole('listitem')).toHaveLength(10);
+    expect(courseMap().getByText('ความปลอดภัยและ JWT Middleware')).toBeVisible();
+    expect(courseMap().getByText('Docker และ CI/CD สำหรับ Authentication')).toBeVisible();
+    expect(screen.getByRole('progressbar', { name: 'ความคืบหน้า' })).toHaveAttribute(
+      'aria-valuenow',
+      '10',
+    );
+    expect(readProgress().completed.certificate).toEqual(['overview']);
+  });
+
+  it('reports completion, percentage, remaining time, and an existing quiz score', () => {
+    saveProgress({
+      version: 1,
+      level: 'certificate',
+      completed: {
+        certificate: ['overview'],
+        diploma: [],
+      },
+      quizScores: { certificate: 4 },
+    });
+    renderAt();
+
+    expect(screen.getByRole('progressbar', { name: 'ความคืบหน้า' })).toHaveAttribute(
+      'aria-valuenow',
+      '13',
+    );
+    expect(screen.getByText('1/8 บท')).toBeVisible();
+    expect(screen.getByText('13%')).toBeVisible();
+    expect(screen.getByText('240 นาที')).toBeVisible();
+    expect(screen.getByText('4/5')).toBeVisible();
+  });
+
+  it('continues from the first incomplete lesson and reviews the final lesson when complete', () => {
+    const { unmount } = renderAt();
+
+    expect(screen.getByRole('link', { name: 'เริ่มบทแรก' })).toHaveAttribute(
+      'href',
+      '#/lesson/overview',
+    );
+    fireEvent.click(screen.getByRole('link', { name: 'เริ่มบทแรก' }));
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      'ภาพรวมระบบ Authentication',
+    );
+
+    unmount();
+    saveProgress({
+      version: 1,
+      level: 'certificate',
+      completed: {
+        certificate: ['overview'],
+        diploma: [],
+      },
+      quizScores: {},
+    });
+    renderAt();
+    expect(screen.getByRole('link', { name: 'เรียนต่อ' })).toHaveAttribute(
+      'href',
+      '#/lesson/installation',
+    );
+
+    unmount();
+    saveProgress({
+      version: 1,
+      level: 'certificate',
+      completed: {
+        certificate: certificateLessons.map((lesson) => lesson.id),
+        diploma: [],
+      },
+      quizScores: {},
+    });
+    renderAt();
+    expect(screen.getByRole('link', { name: 'ทบทวนบทสุดท้าย' })).toHaveAttribute(
+      'href',
+      '#/lesson/testing',
+    );
+  });
+
+  it('updates completion in the shared course map and persists it after remount', async () => {
+    const { unmount } = renderAt('/lesson/overview');
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'ทำเครื่องหมายว่าครบแล้ว' }),
+    );
+    await waitFor(() => {
+      expect(readProgress().completed.certificate).toContain('overview');
+    });
+
+    const breadcrumbs = screen.getByRole('navigation', { name: 'เส้นทางนำทาง' });
+    fireEvent.click(
+      within(breadcrumbs).getByRole('link', { name: 'กลับไปยังแผนภูมิหลักสูตร' }),
+    );
+
+    expect(screen.getByRole('progressbar', { name: 'ความคืบหน้า' })).toHaveAttribute(
+      'aria-valuenow',
+      '13',
+    );
+    expect(courseMap().getAllByRole('listitem')[0]).toHaveTextContent('เสร็จแล้ว');
+
+    unmount();
+    renderAt();
+    expect(screen.getByText('1/8 บท')).toBeVisible();
+    expect(courseMap().getAllByRole('listitem')[0]).toHaveTextContent('เสร็จแล้ว');
+  });
+
+  it('cites the supplied foundations without presenting invented sub-scores', () => {
+    renderAt();
+
+    expect(screen.getByText(/ACFROG\s*57/i)).toBeVisible();
+    expect(screen.getByText(/competition list\s*58/i)).toBeVisible();
+    expect(
+      screen.getByText(/เน้น Authentication และไม่แทนที่ระบบการแข่งขันทั้งหมด/i),
+    ).toBeVisible();
+  });
+
+  it('redirects an unknown route to the dashboard', async () => {
+    renderAt('/not-a-route');
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+        'Login และ Register',
+      );
+    });
+    expect(window.location.hash).toBe('#/');
+  });
+});
+
+
+===== src/pages/LessonPage.test.tsx (current file) =====
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { renderApp } from '../App';
+import { readProgress, saveProgress } from '../lib/progress';
+
+function renderLesson(lessonId: string) {
+  window.location.hash = `#/lesson/${lessonId}`;
+  return render(renderApp());
+}
+
+beforeEach(() => {
+  localStorage.clear();
+  window.location.hash = '#/';
+});
+
+afterEach(() => {
+  window.location.hash = '#/';
+  localStorage.clear();
+});
+
+describe('LessonPage', () => {
+  it('shows the summary, outcomes, stable content placeholders, and current outline item', async () => {
+    saveProgress({
+      version: 1,
+      level: 'certificate',
+      completed: { certificate: ['overview'], diploma: [] },
+      quizScores: {},
+    });
+    renderLesson('overview');
+
+    expect(screen.getByRole('navigation', { name: 'เส้นทางนำทาง' })).toBeVisible();
+    expect(screen.getByText('หลักสูตรปวช.')).toBeVisible();
+    expect(screen.getByText('บทที่ 1')).toBeVisible();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      'ภาพรวมระบบ Authentication',
+    );
+    expect(screen.getByText('10 นาที')).toBeVisible();
+    expect(screen.getByText(/เข้าใจ flow ของ Register, Login และ Session/)).toBeVisible();
+    expect(screen.getByText('Authentication', { selector: 'span' })).toBeVisible();
+    expect(screen.getByText('Flow', { selector: 'span' })).toBeVisible();
+
+    const outcomes = screen.getByRole('list', { name: 'ผลลัพธ์การเรียนรู้' });
+    expect(within(outcomes).getAllByRole('listitem')).toHaveLength(3);
+    expect(document.getElementById('lesson-content')).not.toBeNull();
+    expect(document.getElementById('lesson-checkpoint')).not.toBeNull();
+    expect(screen.getByText(/กำลังเตรียมเนื้อหาอธิบายและตัวอย่าง/i)).toBeVisible();
+
+    const outline = screen.getByRole('navigation', { name: 'ลำดับบทเรียน' });
+    expect(within(outline).getAllByRole('listitem')).toHaveLength(8);
+    expect(
+      within(outline).getByRole('link', { name: /1\. ภาพรวม/ }),
+    ).toHaveAttribute('aria-current', 'page');
+
+    await waitFor(() => {
+      expect(readProgress().lastLessonId).toBe('overview');
+    });
+    expect(readProgress().completed.certificate).toEqual(['overview']);
+  });
+
+  it('toggles completion through shared progress and immediately updates the dashboard', async () => {
+    renderLesson('overview');
+
+    const toggle = screen.getByRole('button', { name: 'ทำเครื่องหมายว่าครบแล้ว' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(toggle);
+
+    const cancel = screen.getByRole('button', { name: 'ยกเลิกเครื่องหมายความคืบหน้า' });
+    expect(cancel).toHaveAttribute('aria-pressed', 'true');
+    await waitFor(() => {
+      expect(readProgress().completed.certificate).toEqual(['overview']);
+    });
+
+    const breadcrumbs = screen.getByRole('navigation', { name: 'เส้นทางนำทาง' });
+    fireEvent.click(
+      within(breadcrumbs).getByRole('link', { name: 'กลับไปยังแผนภูมิหลักสูตร' }),
+    );
+    expect(screen.getByRole('progressbar', { name: 'ความคืบหน้า' })).toHaveAttribute(
+      'aria-valuenow',
+      '13',
+    );
+    expect(screen.getByRole('link', { name: 'เรียนต่อ' })).toHaveAttribute(
+      'href',
+      '#/lesson/installation',
+    );
+
+    fireEvent.click(screen.getByRole('link', { name: 'เรียนต่อ' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'ทำเครื่องหมายว่าครบแล้ว' }),
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'ยกเลิกเครื่องหมายความคืบหน้า' }),
+    );
+    expect(screen.getByRole('button', { name: 'ทำเครื่องหมายว่าครบแล้ว' })).toBeVisible();
+  });
+
+  it('links to the previous and next lessons inside the active track', () => {
+    renderLesson('installation');
+
+    expect(screen.getByRole('link', { name: /บทก่อนหน้า: ภาพรวม/ })).toHaveAttribute(
+      'href',
+      '#/lesson/overview',
+    );
+    const next = screen.getByRole('link', { name: /บทถัดไป: โครงโปรเจกต์/ });
+    expect(next).toHaveAttribute('href', '#/lesson/setup');
+    fireEvent.click(next);
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      'จัดโครงโปรเจกต์และตั้งค่า Environment',
+    );
+  });
+
+  it.each([
+    ['certificate', 'testing'],
+    ['diploma', 'devops'],
+  ] as const)('sends the final %s lesson to practice', (level, lessonId) => {
+    saveProgress({
+      version: 1,
+      level,
+      completed: { certificate: [], diploma: [] },
+      quizScores: {},
+    });
+    renderLesson(lessonId);
+
+    const practice = screen.getByRole('link', { name: /ไปยังฝึกท้ายบท/ });
+    expect(practice).toHaveAttribute('href', '#/practice');
+    fireEvent.click(practice);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      'ฝึกท้ายบทAuthentication',
+    );
+  });
+
+  it('redirects a diploma-only lesson when the certificate track is active', async () => {
+    renderLesson('devops');
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+        'Login และ Register',
+      );
+    });
+    expect(screen.queryByRole('heading', { name: /Docker และ CI\/CD/ })).toBeNull();
+    expect(window.location.hash).toBe('#/');
+  });
+
+  it('redirects an unknown lesson id to the dashboard', async () => {
+    renderLesson('unknown-lesson');
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+        'Login และ Register',
+      );
+    });
+    expect(window.location.hash).toBe('#/');
+  });
+
+  it('shows the coming-next demo placeholder from the dashboard', () => {
+    window.location.hash = '#/';
+    render(renderApp());
+    fireEvent.click(screen.getByRole('link', { name: /ดู Demo Authentication/i }));
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      'Authentication Demo',
+    );
+    expect(screen.getByText(/กำลังเตรียมพื้นที่ทดลอง/i)).toBeVisible();
+  });
+});

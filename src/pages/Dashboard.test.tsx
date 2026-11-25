@@ -5,6 +5,8 @@ import { useClassroomProgress } from '../context/ProgressContext';
 import { certificateLessons } from '../data/course';
 import { readProgress, saveProgress } from '../lib/progress';
 
+const scrollIntoView = vi.fn();
+
 function renderAt(path = '/') {
   window.location.hash = `#${path}`;
   return render(renderApp());
@@ -21,11 +23,17 @@ function courseMap() {
 beforeEach(() => {
   localStorage.clear();
   window.location.hash = '#/';
+  scrollIntoView.mockClear();
+  Object.defineProperty(Element.prototype, 'scrollIntoView', {
+    configurable: true,
+    value: scrollIntoView,
+  });
 });
 
 afterEach(() => {
   window.location.hash = '#/';
   localStorage.clear();
+  scrollIntoView.mockClear();
 });
 
 describe('Dashboard', () => {
@@ -119,7 +127,7 @@ describe('Dashboard', () => {
   it('continues from the first incomplete lesson and reviews the final lesson when complete', () => {
     const { unmount } = renderAt();
 
-    expect(screen.getByRole('link', { name: 'เริ่มบทแรก' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'เริ่มเรียน' })).toHaveAttribute(
       'href',
       '#/lesson/overview',
     );
@@ -138,11 +146,16 @@ describe('Dashboard', () => {
       },
       quizScores: {},
     });
-    renderAt();
+    const progressed = renderAt();
     expect(screen.getByRole('link', { name: 'เรียนต่อ' })).toHaveAttribute(
       'href',
       '#/lesson/installation',
     );
+    expect(
+      within(progressed.container.querySelector('main') as HTMLElement).getByRole('link', {
+        name: 'เริ่มเรียน',
+      }),
+    ).toHaveAttribute('href', '#/lesson/installation');
 
     unmount();
     saveProgress({
@@ -154,11 +167,16 @@ describe('Dashboard', () => {
       },
       quizScores: {},
     });
-    renderAt();
+    const completed = renderAt();
     expect(screen.getByRole('link', { name: 'ทบทวนบทสุดท้าย' })).toHaveAttribute(
       'href',
       '#/lesson/testing',
     );
+    expect(
+      within(completed.container.querySelector('main') as HTMLElement).getByRole('link', {
+        name: 'เริ่มเรียน',
+      }),
+    ).toHaveAttribute('href', '#/lesson/testing');
   });
 
   it('updates completion in the shared course map and persists it after remount', async () => {
@@ -186,6 +204,17 @@ describe('Dashboard', () => {
     renderAt();
     expect(screen.getByText('1/8 บท')).toBeVisible();
     expect(courseMap().getAllByRole('listitem')[0]).toHaveTextContent('เสร็จแล้ว');
+  });
+
+  it('opens the course-map fragment and focuses its scroll target', async () => {
+    renderAt('/#course-map');
+
+    await waitFor(() => {
+      expect(document.getElementById('course-map')).toHaveFocus();
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' });
+    });
+    expect(window.location.hash).toBe('#/#course-map');
+    expect(scrollIntoView.mock.instances.at(-1)).toBe(document.getElementById('course-map'));
   });
 
   it('cites the supplied foundations without presenting invented sub-scores', () => {

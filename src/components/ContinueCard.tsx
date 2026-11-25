@@ -79,7 +79,7 @@ export function ContinueCard({ lessons }: ContinueCardProps) {
 
         <Link
           to={`/lesson/${selection.lesson.id}`}
-          className="group mt-6 inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-xl bg-coral px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#e85f50] focus-visible:outline-white sm:w-auto"
+          className="group mt-6 inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-xl bg-coral px-5 py-3 text-sm font-semibold text-ink transition-colors hover:bg-[#e85f50] focus-visible:outline-white sm:w-auto"
         >
           {selection.label}
           <ArrowRight

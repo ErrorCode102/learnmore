@@ -1,7 +1,9 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../App';
 import { readProgress, saveProgress } from '../lib/progress';
+
+const scrollIntoView = vi.fn();
 
 function renderLesson(lessonId: string) {
   window.location.hash = `#/lesson/${lessonId}`;
@@ -11,11 +13,17 @@ function renderLesson(lessonId: string) {
 beforeEach(() => {
   localStorage.clear();
   window.location.hash = '#/';
+  scrollIntoView.mockClear();
+  Object.defineProperty(Element.prototype, 'scrollIntoView', {
+    configurable: true,
+    value: scrollIntoView,
+  });
 });
 
 afterEach(() => {
   window.location.hash = '#/';
   localStorage.clear();
+  scrollIntoView.mockClear();
 });
 
 describe('LessonPage', () => {
@@ -107,6 +115,53 @@ describe('LessonPage', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       'จัดโครงโปรเจกต์และตั้งค่า Environment',
     );
+  });
+
+  it('moves focus to the next lesson main content and resets scroll', async () => {
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+    renderLesson('installation');
+
+    try {
+      const next = screen.getByRole('link', { name: /บทถัดไป: โครงโปรเจกต์/ });
+      next.focus();
+      fireEvent.click(next);
+
+      await waitFor(() => {
+        expect(document.getElementById('main-content')).toHaveFocus();
+        expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'instant' });
+      });
+      expect(window.location.hash).toBe('#/lesson/setup');
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+        'จัดโครงโปรเจกต์และตั้งค่า Environment',
+      );
+    } finally {
+      scrollTo.mockRestore();
+    }
+  });
+
+  it('uses the breadcrumb fragment to focus and scroll the course map', async () => {
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+    renderLesson('overview');
+
+    try {
+      scrollTo.mockClear();
+      const breadcrumbs = screen.getByRole('navigation', { name: 'เส้นทางนำทาง' });
+      const breadcrumb = within(breadcrumbs).getByRole('link', {
+        name: 'กลับไปยังแผนภูมิหลักสูตร',
+      });
+      expect(breadcrumb).toHaveAttribute('href', '#/#course-map');
+      fireEvent.click(breadcrumb);
+
+      await waitFor(() => {
+        expect(document.getElementById('course-map')).toHaveFocus();
+        expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' });
+      });
+      expect(window.location.hash).toBe('#/#course-map');
+      expect(scrollIntoView.mock.instances.at(-1)).toBe(document.getElementById('course-map'));
+      expect(scrollTo).not.toHaveBeenCalled();
+    } finally {
+      scrollTo.mockRestore();
+    }
   });
 
   it.each([

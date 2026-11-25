@@ -5,7 +5,7 @@ import {
   LayoutDashboard,
   ShieldCheck,
 } from 'lucide-react';
-import type { MouseEvent } from 'react';
+import { useEffect, type MouseEvent } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { getContinueSelection } from './ContinueCard';
 import { useClassroomProgress } from '../context/ProgressContext';
@@ -39,8 +39,22 @@ export function AppShell() {
   const completedCount = progress.completed[level].length;
   const continueSelection = getContinueSelection(lessons, progress.completed[level]);
 
+  useEffect(() => {
+    const target =
+      location.hash === '#course-map'
+        ? document.getElementById('course-map')
+        : document.getElementById('main-content');
+
+    if (location.hash === '#course-map') {
+      target?.scrollIntoView({ block: 'start' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+    target?.focus({ preventScroll: true });
+  }, [location.key, location.pathname, location.hash]);
+
   return (
-    <div className="relative isolate min-h-screen overflow-x-hidden bg-canvas font-sans text-ink">
+    <div className="relative isolate min-h-screen overflow-x-clip bg-canvas font-sans text-ink">
       <div
         aria-hidden="true"
         className="classroom-grid pointer-events-none absolute inset-x-0 top-0 -z-10 h-[680px] opacity-55"

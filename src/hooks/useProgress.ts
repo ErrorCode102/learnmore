@@ -26,6 +26,12 @@ export function useProgress() {
     setProgress((current) => toggleLessonProgress(current, id, level));
   }, []);
 
+  const visitLesson = useCallback((id: LessonId) => {
+    setProgress((current) =>
+      current.lastLessonId === id ? current : { ...current, lastLessonId: id },
+    );
+  }, []);
+
   const recordQuiz = useCallback((level: Level, score: number) => {
     setProgress((current) => recordQuizProgress(current, level, score));
   }, []);
@@ -39,6 +45,7 @@ export function useProgress() {
     level: progress.level,
     setLevel,
     toggleLesson,
+    visitLesson,
     recordQuiz,
     reset,
   };

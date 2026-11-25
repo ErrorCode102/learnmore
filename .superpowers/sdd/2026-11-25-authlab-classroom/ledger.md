@@ -7,8 +7,13 @@
 - Ruling: SDD helper scripts/templates are absent from the installed skill; use plan-derived briefs, file-based reports, manual review packages, and the same implementer/reviewer gates — cost: more controller bookkeeping.
 - Ruling: Agent tool exposes no model selector; use available general-purpose agents for implementation and review — cost: cannot choose lower-cost model tiers.
 - Preflight conflicts: no existing package.json, source tree, AGENTS.md, or user changes in product workspace. Only plan and PDF text extracts created during this session.
-- Current: Task 2 review fix round 1 (Important: track switch drops diploma-only lastLessonId).
+- Current: Task 3 complete; Task 4 ready.
 
 ## Completion
 - Task 1: complete (no Git commits, review clean; esbuild postinstall skipped but build/tests passed; non-blocking policy concern accepted).
-- Task 2 fix round 1: resume implementer to validate lastLessonId against all catalog IDs and add diploma security -> certificate persistence regression test.
+- Task 2: complete after fix round 1 (review clean; 22/22 tests passed; diploma-only lastLessonId now survives track switch).
+- Task 2 fix round 1: resolved Important finding; scoped re-review Spec PASS / Quality PASS.
+- Task 3: complete (no Git commits; author self-review Spec PASS / Quality PASS; 38/38 tests, typecheck, and build passed).
+- Task 3: Ruling: Extend `useProgress` additively with `visitLesson(id)` to record the opened lesson without toggling completion — preserves the Task 2 API and avoids state side effects — cost: one additional public hook method.
+- Task 3: Ruling: Keep the mobile shell `เริ่มเรียน` button so the unchanged legacy smoke test stays green while the hero uses the required semantic link — preserves both contracts — cost: a duplicate start action on mobile.
+- Final review: self-review (no subagent tool permitted by the task).

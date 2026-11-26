@@ -3,6 +3,7 @@ import {
   BookMarked,
   Braces,
   Check,
+  ClipboardCheck,
   Code2,
   Database,
   Layers3,
@@ -16,6 +17,7 @@ import { LevelSwitcher } from '../components/LevelSwitcher';
 import { ProgressBar } from '../components/ProgressBar';
 import { useClassroomProgress } from '../context/ProgressContext';
 import { getLessonsForLevel } from '../data/course';
+import { passingScore } from '../lib/quiz';
 
 const learningSteps = [
   { title: 'เข้าใจ Flow', detail: 'Login, Register และ Session' },
@@ -355,7 +357,37 @@ export function Dashboard() {
                 เปิดบทเรียนตามลำดับ และทำเครื่องหมายความคืบหน้าเมื่อพร้อมไปต่อ
               </p>
             </div>
-            <p className="font-mono text-xs text-muted">{lessons.length} lessons</p>
+            <div className="flex flex-col items-start gap-3 sm:items-end">
+              <div className="flex flex-wrap items-center gap-3">
+                {quizScore !== undefined && (
+                  <p
+                    role="status"
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                      quizScore >= passingScore
+                        ? 'bg-soft-success text-success'
+                        : 'bg-soft-coral text-danger'
+                    }`}
+                  >
+                    {quizScore >= passingScore
+                      ? `ผ่านแล้ว ${quizScore}/5`
+                      : `คะแนน ${quizScore}/5`}
+                  </p>
+                )}
+                <Link
+                  to="/practice"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-brand-solid px-4 py-2.5 text-sm font-semibold text-on-inverse transition-colors hover:bg-brand-solid-hover"
+                >
+                  <ClipboardCheck aria-hidden="true" className="h-4 w-4" />
+                  {quizScore === undefined
+                    ? 'เริ่มแบบฝึกหัด'
+                    : quizScore < passingScore
+                      ? 'ทำแบบฝึกหัดใหม่'
+                      : 'ทบทวนแบบฝึกหัด'}
+                </Link>
+              </div>
+              <p className="font-mono text-xs text-muted">{lessons.length} lessons</p>
+              <p className="text-xs text-muted">{trackNames[level]}</p>
+            </div>
           </div>
 
           <ol

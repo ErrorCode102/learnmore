@@ -14,7 +14,7 @@ Spec: approved short design in conversation (no separate design file): Thai clas
 - โปรเจกต์ไม่มี git repository; ไม่สร้าง commit หรือ branch
 - ใช้ Node.js ที่มีในเครื่อง (v24.22.1) และไม่ติดตั้งซอฟต์แวร์ระบบ
 
-Ruling from existing ledger: the workspace is now a Git repository, but the approved plan still forbids new commits/branches; use the current working tree and baseline `dd0bfc4` for review packaging.
+Ruling from existing ledger: the workspace is now a Git repository, but the approved plan still forbids new commits/branches; use the current working tree and baseline `bceedea843ae11760bf237bcf2120192eafaf9e2` for review packaging. External checkpoint commits `dc07d75` and `bceedea` appeared during Task 12; do not amend, reset or push them.
 
 ## Required files
 

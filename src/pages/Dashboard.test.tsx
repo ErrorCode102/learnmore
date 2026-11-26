@@ -270,6 +270,91 @@ describe('Dashboard', () => {
     ).toBeVisible();
   });
 
+  it('shows a course-map quiz CTA for a track with no stored score', () => {
+    renderAt();
+    const map = screen.getByRole('region', { name: 'แผนภูมิหลักสูตร' });
+
+    expect(within(map).getByText('ประกาศนียบัตรวิชาชีพ (ปวช.)')).toBeVisible();
+    const link = within(map).getByRole('link', { name: 'เริ่มแบบฝึกหัด' });
+    expect(link).toHaveAttribute('href', '#/practice');
+    expect(link).toHaveClass('bg-brand-solid', 'text-on-inverse');
+    expect(within(map).queryByText(/คะแนน \d\/5/)).not.toBeInTheDocument();
+    expect(within(map).queryByText(/ผ่านแล้ว \d\/5/)).not.toBeInTheDocument();
+  });
+
+  it('shows a failing course-map quiz status and retry link', () => {
+    saveProgress({
+      version: 1,
+      level: 'certificate',
+      completed: { certificate: ['overview'], diploma: [] },
+      quizScores: { certificate: 2 },
+    });
+    renderAt();
+    const map = screen.getByRole('region', { name: 'แผนภูมิหลักสูตร' });
+
+    expect(within(map).getByText('คะแนน 2/5')).toBeVisible();
+    expect(within(map).getByRole('link', { name: 'ทำแบบฝึกหัดใหม่' })).toHaveAttribute(
+      'href',
+      '#/practice',
+    );
+    expect(within(map).queryByText('ผ่านแล้ว 2/5')).not.toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: 'ความคืบหน้า' })).toHaveAttribute(
+      'aria-valuenow',
+      '13',
+    );
+  });
+
+  it('shows a success-styled course-map status and review link for a passing score', () => {
+    saveProgress({
+      version: 1,
+      level: 'certificate',
+      completed: { certificate: [], diploma: [] },
+      quizScores: { certificate: 5 },
+    });
+    renderAt();
+    const map = screen.getByRole('region', { name: 'แผนภูมิหลักสูตร' });
+
+    expect(within(map).getByText('ผ่านแล้ว 5/5')).toHaveClass('bg-soft-success', 'text-success');
+    expect(within(map).getByRole('link', { name: 'ทบทวนแบบฝึกหัด' })).toHaveAttribute(
+      'href',
+      '#/practice',
+    );
+  });
+
+  it('preserves course-map quiz status and scores when switching tracks', () => {
+    saveProgress({
+      version: 1,
+      level: 'certificate',
+      completed: { certificate: ['overview'], diploma: ['security'] },
+      quizScores: { certificate: 2, diploma: 4 },
+    });
+    renderAt();
+    let map = screen.getByRole('region', { name: 'แผนภูมิหลักสูตร' });
+    expect(within(map).getByText('คะแนน 2/5')).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: 'ปวส.' }));
+
+    map = screen.getByRole('region', { name: 'แผนภูมิหลักสูตร' });
+    expect(within(map).getByText('ประกาศนียบัตรวิชาชีพชั้นสูง (ปวส.)')).toBeVisible();
+    expect(within(map).getByText('ผ่านแล้ว 4/5')).toHaveClass('bg-soft-success', 'text-success');
+    expect(within(map).getByRole('link', { name: 'ทบทวนแบบฝึกหัด' })).toBeVisible();
+    expect(screen.getByRole('progressbar', { name: 'ความคืบหน้า' })).toHaveAttribute(
+      'aria-valuenow',
+      '10',
+    );
+    expect(readProgress().quizScores).toEqual({ certificate: 2, diploma: 4 });
+    expect(readProgress().completed).toEqual({
+      certificate: ['overview'],
+      diploma: ['security'],
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'ปวช.' }));
+
+    map = screen.getByRole('region', { name: 'แผนภูมิหลักสูตร' });
+    expect(within(map).getByText('คะแนน 2/5')).toBeVisible();
+    expect(within(map).getByRole('link', { name: 'ทำแบบฝึกหัดใหม่' })).toBeVisible();
+  });
+
   it('redirects an unknown route to the dashboard', async () => {
     renderAt('/not-a-route');
 

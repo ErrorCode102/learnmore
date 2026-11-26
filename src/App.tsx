@@ -3,6 +3,7 @@ import { HashRouter, Link, Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { ProgressProvider } from './context/ProgressContext';
 import { Dashboard } from './pages/Dashboard';
+import { DemoPage } from './pages/DemoPage';
 import { LessonPage } from './pages/LessonPage';
 
 interface ComingNextProps {
@@ -58,15 +59,7 @@ export function renderApp() {
                 />
               }
             />
-            <Route
-              path="/demo"
-              element={
-                <ComingNext
-                  title="Authentication Demo"
-                  description="พื้นที่สำหรับทดลองการสมัครสมาชิก เข้าสู่ระบบ และดู flow ของ Authentication ในเบราว์เซอร์"
-                />
-              }
-            />
+            <Route path="/demo" element={<DemoPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

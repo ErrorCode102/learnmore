@@ -339,7 +339,7 @@ describe('LessonPage', () => {
     expect(window.location.hash).toBe('#/');
   });
 
-  it('shows the coming-next demo placeholder from the dashboard', () => {
+  it('opens the working authentication demo from the dashboard', () => {
     window.location.hash = '#/';
     render(renderApp());
     fireEvent.click(screen.getByRole('link', { name: /ดู Demo Authentication/i }));
@@ -347,6 +347,7 @@ describe('LessonPage', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       'Authentication Demo',
     );
-    expect(screen.getByText(/กำลังเตรียมพื้นที่ทดลอง/i)).toBeVisible();
+    expect(screen.getByRole('button', { name: 'สร้างบัญชี Demo' })).toBeVisible();
+    expect(screen.getByText(/Demo นี้ไม่ใช่ production authentication/i)).toBeVisible();
   });
 });

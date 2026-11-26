@@ -1,8 +1,9 @@
+/// <reference types="node" />
 import { webcrypto } from 'node:crypto';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../App';
-import { registerUser, resetDemoData } from '../lib/authDemo';
+import { logout, registerUser, resetDemoData } from '../lib/authDemo';
 
 const USERS_KEY = 'auth-classroom:demo-users:v1';
 const SESSION_KEY = 'auth-classroom:demo-session:v1';
@@ -44,6 +45,7 @@ describe('Authentication Demo page', () => {
     renderDemo();
 
     expect(screen.getByRole('heading', { level: 1, name: 'Authentication Demo' })).toBeVisible();
+    expect(screen.getAllByRole('main')).toHaveLength(1);
     expect(screen.getByText(/Demo นี้ไม่ใช่ production authentication/i)).toBeVisible();
     expect(screen.getByRole('button', { name: 'สมัครสมาชิก' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByLabelText('ชื่อที่แสดง')).toBeVisible();
@@ -85,6 +87,7 @@ describe('Authentication Demo page', () => {
 
   it('shows the same generic message for a wrong password', async () => {
     await registerUser(account);
+    logout();
     renderDemo();
     fireEvent.click(screen.getByRole('button', { name: 'เข้าสู่ระบบ' }));
     fillLogin('WrongPass9!');

@@ -35,3 +35,4 @@
 - Task 4: minor (deferred): .dockerignore caption incorrectly offers auth-lab root placement for nested build contexts at src/data/snippets/devops.ts:151.
 - Task 4: minor (deferred): installation uses PowerShell-incompatible `where` at src/data/snippets/installation.ts:10,13,24.
 - Task 4: complete after independent repair re-review (no Git commits; Spec PASS / Quality PASS; 89/89 tests, typecheck and build passed).
+- Task 5: independent review pending — browser Demo implemented with PBKDF2-SHA256 120,000 iterations; 113/113 tests, typecheck and static build passed; real-browser Register → Logout → Login passed with no plaintext password in storage and no console errors after reload. Vercel compatibility confirmed for Vite static output and HashRouter; production preview at port 4173 rendered /#/demo with no console errors. Publication requires explicit approval.

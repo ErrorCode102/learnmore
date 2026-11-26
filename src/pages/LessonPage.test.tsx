@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../App';
+import { getLessonContent } from '../data/course';
 import { readProgress, saveProgress } from '../lib/progress';
 
 const scrollIntoView = vi.fn();
@@ -24,10 +25,11 @@ afterEach(() => {
   window.location.hash = '#/';
   localStorage.clear();
   scrollIntoView.mockClear();
+  vi.unstubAllGlobals();
 });
 
 describe('LessonPage', () => {
-  it('shows the summary, outcomes, stable content placeholders, and current outline item', async () => {
+  it('shows the summary, outcomes, real lesson content, and current outline item', async () => {
     saveProgress({
       version: 1,
       level: 'certificate',
@@ -47,11 +49,27 @@ describe('LessonPage', () => {
     expect(screen.getByText('Authentication', { selector: 'span' })).toBeVisible();
     expect(screen.getByText('Flow', { selector: 'span' })).toBeVisible();
 
+    const lesson = getLessonContent('certificate', 'overview')!;
     const outcomes = screen.getByRole('list', { name: 'ผลลัพธ์การเรียนรู้' });
     expect(within(outcomes).getAllByRole('listitem')).toHaveLength(3);
     expect(document.getElementById('lesson-content')).not.toBeNull();
     expect(document.getElementById('lesson-checkpoint')).not.toBeNull();
-    expect(screen.getByText(/กำลังเตรียมเนื้อหาอธิบายและตัวอย่าง/i)).toBeVisible();
+    expect(screen.getByText(lesson.intro)).toBeVisible();
+    expect(screen.getByRole('list', { name: 'ภาพรวมเส้นทางข้อมูล' })).toBeVisible();
+    expect(screen.queryByText(/กำลังเตรียมเนื้อหาอธิบายและตัวอย่าง/i)).toBeNull();
+
+    const contents = screen.getByRole('navigation', { name: 'เนื้อหาในบทเรียน' });
+    expect(within(contents).getAllByRole('button')).toHaveLength(lesson.sections.length);
+    const requestExplorer = screen.getByRole('region', { name: 'โค้ด examples/register-request.http' });
+    expect(requestExplorer).toBeVisible();
+    expect(within(requestExplorer).getByRole('heading', { name: 'บรรทัด 1' })).toBeVisible();
+    expect(within(requestExplorer).getByText('ระบุ method POST, path /api/auth/register และ HTTP/1.1 เพื่อส่งคำขอสร้างผู้ใช้ไปยัง Backend')).toBeVisible();
+
+    const checkpoint = document.getElementById('lesson-checkpoint')!;
+    expect(within(checkpoint).getByText(lesson.checkpoint.summary)).toBeVisible();
+    expect(
+      within(screen.getByRole('list', { name: 'เช็กลิสต์จุดตรวจความเข้าใจ' })).getAllByRole('listitem'),
+    ).toHaveLength(lesson.checkpoint.checklist.length);
 
     const outline = screen.getByRole('navigation', { name: 'ลำดับบทเรียน' });
     expect(within(outline).getAllByRole('listitem')).toHaveLength(8);
@@ -63,6 +81,120 @@ describe('LessonPage', () => {
       expect(readProgress().lastLessonId).toBe('overview');
     });
     expect(readProgress().completed.certificate).toEqual(['overview']);
+  });
+
+  it('shows diploma trade-offs only on the diploma track', () => {
+    saveProgress({
+      version: 1,
+      level: 'diploma',
+      completed: { certificate: [], diploma: [] },
+      quizScores: {},
+    });
+    const diplomaLesson = getLessonContent('diploma', 'overview')!;
+    renderLesson('overview');
+
+    expect(screen.getByRole('navigation', { name: 'ลำดับบทเรียน' }).querySelectorAll('li')).toHaveLength(10);
+    const diplomaNote = diplomaLesson.sections.find((section) => section.diplomaNote)!.diplomaNote!;
+    expect(screen.getByText(diplomaNote)).toBeVisible();
+    expect(screen.getByText('หลักสูตรปวส.')).toBeVisible();
+  });
+
+  it('moves the contents outline selection and focus without IntersectionObserver', () => {
+    vi.stubGlobal('IntersectionObserver', undefined);
+    renderLesson('overview');
+    const contents = screen.getByRole('navigation', { name: 'เนื้อหาในบทเรียน' });
+    const target = within(contents).getByRole('button', {
+      name: 'HTTP, JSON และสัญญาร่วมระหว่าง Frontend/Backend',
+    });
+
+    fireEvent.click(target);
+
+    expect(target).toHaveAttribute('aria-current', 'location');
+    expect(document.getElementById('http-json-contract-title')).toHaveFocus();
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' });
+  });
+
+  it('uses rootMargin units accepted by native IntersectionObserver', () => {
+    class StrictObserver {
+      constructor(_callback: IntersectionObserverCallback, options?: IntersectionObserverInit) {
+        if (options?.rootMargin?.includes('rem')) {
+          throw new SyntaxError('rootMargin must be specified in pixels or percent');
+        }
+      }
+      observe() {}
+      disconnect() {}
+      unobserve() {}
+      takeRecords = () => [];
+    }
+    vi.stubGlobal('IntersectionObserver', StrictObserver);
+
+    renderLesson('overview');
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      'ภาพรวมระบบ Authentication',
+    );
+    expect(document.getElementById('lesson-content')).toBeVisible();
+  });
+
+  it('updates the active section from IntersectionObserver entries', async () => {
+    let callback: IntersectionObserverCallback | undefined;
+    const observe = vi.fn();
+    const disconnect = vi.fn();
+    class Observer {
+      constructor(observerCallback: IntersectionObserverCallback) {
+        callback = observerCallback;
+      }
+      observe = observe;
+      disconnect = disconnect;
+      unobserve = vi.fn();
+      takeRecords = vi.fn(() => []);
+    }
+    vi.stubGlobal('IntersectionObserver', Observer);
+    renderLesson('overview');
+
+    expect(observe).toHaveBeenCalledTimes(getLessonContent('certificate', 'overview')!.sections.length);
+    const section = document.getElementById('http-json-contract')!;
+    callback!(
+      [
+        {
+          target: section,
+          isIntersecting: true,
+          boundingClientRect: { top: 120 },
+        } as unknown as IntersectionObserverEntry,
+      ],
+      {} as IntersectionObserver,
+    );
+
+    const contents = screen.getByRole('navigation', { name: 'เนื้อหาในบทเรียน' });
+    await waitFor(() => {
+      expect(
+        within(contents).getByRole('button', {
+          name: 'HTTP, JSON และสัญญาร่วมระหว่าง Frontend/Backend',
+        }),
+      ).toHaveAttribute('aria-current', 'location');
+    });
+  });
+
+  it('copies lesson code and shows visible feedback', async () => {
+    const originalClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+
+    try {
+      const lesson = getLessonContent('certificate', 'overview')!;
+      renderLesson('overview');
+      const explorer = screen.getByRole('region', { name: 'โค้ด examples/register-request.http' });
+      fireEvent.click(within(explorer).getByRole('button', { name: 'คัดลอกโค้ด' }));
+
+      expect(await within(explorer).findByText('คัดลอกแล้ว')).toBeVisible();
+      expect(writeText).toHaveBeenCalledWith(lesson.sections[1].snippets![0].code);
+    } finally {
+      if (originalClipboard) {
+        Object.defineProperty(navigator, 'clipboard', originalClipboard);
+      } else {
+        Reflect.deleteProperty(navigator, 'clipboard');
+      }
+    }
   });
 
   it('toggles completion through shared progress and immediately updates the dashboard', async () => {

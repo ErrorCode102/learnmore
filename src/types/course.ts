@@ -30,6 +30,7 @@ export interface LessonSection {
   title: string;
   body: string[];
   bullets?: string[];
+  flow?: Array<{ label: string; detail: string }>;
   snippets?: CodeSnippet[];
   callouts?: LessonCallout[];
   diplomaNote?: string;

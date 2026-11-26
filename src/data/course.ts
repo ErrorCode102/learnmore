@@ -1,4 +1,6 @@
-import type { LessonId, LessonSummary, Level } from '../types/course';
+import type { LessonContent, LessonId, LessonSummary, Level } from '../types/course';
+import { createCertificateLessonContent } from './lessons/certificate';
+import { createDiplomaLessonContent } from './lessons/diploma';
 
 const coreLessons: Omit<LessonSummary, 'level'>[] = [
   {
@@ -178,4 +180,14 @@ export function getLessonsForLevel(level: Level): LessonSummary[] {
 
 export function getLessonSummary(level: Level, id: LessonId): LessonSummary | undefined {
   return getLessonsForLevel(level).find((lesson) => lesson.id === id);
+}
+
+export const certificateLessonContent: LessonContent[] = createCertificateLessonContent(
+  certificateLessons,
+);
+export const diplomaLessonContent: LessonContent[] = createDiplomaLessonContent(diplomaLessons);
+
+export function getLessonContent(level: Level, id: LessonId): LessonContent | undefined {
+  const lessons = level === 'diploma' ? diplomaLessonContent : certificateLessonContent;
+  return lessons.find((lesson) => lesson.id === id);
 }

@@ -52,6 +52,12 @@ function allSnippets(lessons: LessonContent[]) {
   return lessons.flatMap((lesson) => lesson.sections.flatMap((section) => section.snippets ?? []));
 }
 
+function getSnippet(id: string) {
+  const snippet = allSnippets(contentCourse.diplomaLessonContent).find((item) => item.id === id);
+  expect(snippet, `missing snippet ${id}`).toBeDefined();
+  return snippet!;
+}
+
 function lessonText(lesson: LessonContent) {
   return [
     lesson.intro,
@@ -193,6 +199,87 @@ describe('AuthLab lesson content', () => {
     expect(securityText).toMatch(/Demo.*ไม่ใช่ production|ไม่ใช่ production auth/i);
     expect(securityText).not.toMatch(/(supersecret|my-secret|change-me|password123)/i);
     expect(securityText).not.toMatch(/process\.env\.JWT_SECRET\s*\|\|\s*['"][^'"]+['"]/);
+  });
+
+  it('creates the auth router before registering routes and mounts it after the backend lesson', () => {
+    const routes = getSnippet('backend-auth-routes').code;
+    expect(routes.indexOf('const router = Router();')).toBeGreaterThan(-1);
+    expect(routes.indexOf('const router = Router();')).toBeLessThan(routes.indexOf("router.post('/register'"));
+
+    const setupApp = getSnippet('setup-app').code;
+    expect(setupApp).not.toContain("import authRoutes from './routes/authRoutes.js'");
+    const backendApp = getSnippet('backend-auth-app').code;
+    expect(backendApp).toContain("import authRoutes from './routes/authRoutes.js'");
+    expect(backendApp).toContain("app.use('/api/auth', authRoutes);");
+  });
+
+  it('keeps the Vue TypeScript scaffold, Tailwind styling, and created folders coherent', () => {
+    const setup = getSnippet('setup-create-project').code;
+    expect(setup).toContain('mkdir -p src/{api,router,stores,views}');
+    expect(setup).toContain('tailwindcss @tailwindcss/vite');
+    expect(getSnippet('setup-create-project').caption).toContain('Git Bash');
+    expect(getSnippet('setup-backend-package').code).toContain('cookie-parser');
+
+    const entry = getSnippet('frontend-main');
+    expect(entry.filename).toBe('auth-frontend/src/main.ts');
+    expect(entry.code).toContain("import './style.css';");
+    expect(getSnippet('setup-vite-proxy').code).toContain("import tailwindcss from '@tailwindcss/vite'");
+    expect(getSnippet('setup-vite-proxy').code).toContain('tailwindcss()');
+    expect(getSnippet('setup-frontend-style').code).toContain('@import "tailwindcss";');
+  });
+
+  it('installs, mounts, and protects the refresh-token flow with atomic rotation', () => {
+    expect(getSnippet('setup-create-project').code).toContain('cookie-parser');
+    expect(getSnippet('setup-backend-package').code).toContain('cookie-parser');
+    const app = getSnippet('security-refresh-app').code;
+    expect(app).toContain("import refreshRoutes from './routes/refreshRoutes.js'");
+    expect(app).toContain("app.use('/api/auth', refreshRoutes);");
+
+    const routes = getSnippet('security-refresh-routes').code;
+    expect(routes).toContain('function requireTrustedOrigin');
+    expect(routes).toContain("router.post('/refresh', requireTrustedOrigin, cookieParser()");
+    expect(routes).toContain("router.post('/logout', requireTrustedOrigin, cookieParser()");
+    expect(routes).toContain('CLIENT_ORIGINS');
+
+    const service = getSnippet('security-refresh-token-service').code;
+    expect(service).toContain('beginTransaction()');
+    expect(service).toContain('FOR UPDATE');
+    expect(service).toContain('revoked_at IS NULL');
+    expect(service).toContain('affectedRows');
+    expect(service).toContain('commit()');
+    expect(service).toContain('rollback()');
+    expect(getSnippet('security-refresh-token-service').notes).toContain(
+      'ใช้ SameSite=Lax เพื่อลดการส่ง cookie ข้าม site แต่ต้องตรวจ Origin เพิ่ม เพราะ cookie ไม่ถูกส่งบน cross-site POST โดยทั่วไป',
+    );
+  });
+
+  it('deploys the same immutable images that CI pushes and includes the nginx config', () => {
+    const dockerfile = getSnippet('devops-frontend-dockerfile').code;
+    expect(dockerfile).toContain('COPY nginx.conf ./nginx.conf');
+
+    const compose = getSnippet('devops-compose').code;
+    expect(compose).toContain('./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro');
+    expect(compose).toContain('image: ${AUTH_BACKEND_IMAGE:-authlab-backend:local}');
+    expect(compose).toContain('image: ${AUTH_FRONTEND_IMAGE:-authlab-frontend:local}');
+
+    const ci = getSnippet('devops-gitlab-ci').code;
+    expect(ci).toContain("docker login '$CI_REGISTRY'");
+    expect(ci).toContain("AUTH_BACKEND_IMAGE='$CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA'");
+    expect(ci).toContain("AUTH_FRONTEND_IMAGE='$CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA'");
+
+    const nginxLines = getSnippet('devops-nginx-config').code.split('\n');
+    const nginxNotes = getSnippet('devops-nginx-config').notes;
+    expect(nginxNotes[nginxLines.indexOf('    try_files $uri $uri/ /index.html;')]).toContain('try_files');
+    expect(nginxNotes[nginxLines.indexOf('    add_header X-Content-Type-Options nosniff always;')]).toContain('nosniff');
+    expect(nginxNotes[nginxLines.indexOf('    add_header Referrer-Policy strict-origin-when-cross-origin always;')]).toContain('Referrer-Policy');
+  });
+
+  it('creates an expired token for an existing user so expiry is the only rejection cause', () => {
+    const script = getSnippet('testing-create-expired-token').code;
+    expect(script).toContain('SELECT id FROM users ORDER BY id LIMIT 1');
+    expect(script).toContain('sub: process.argv[1]');
+    expect(script).toContain("algorithm: 'HS256'");
+    expect(getSnippet('testing-create-expired-token').caption).toContain('Register');
   });
 
   it('uses one coherent project vocabulary and verifiable command output', () => {

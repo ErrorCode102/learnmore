@@ -1,39 +1,8 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import type { ComponentType } from 'react';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-
-interface CodeSnippet {
-  id: string;
-  filename: string;
-  language: 'bash' | 'sql' | 'javascript' | 'vue' | 'json' | 'text';
-  code: string;
-  notes: string[];
-  caption?: string;
-}
-
-interface ExplorerProps {
-  snippet: CodeSnippet;
-}
-
-interface CalloutProps {
-  tone: 'info' | 'warning' | 'success';
-  title: string;
-  text: string;
-}
-
-let CodeExplorer: ComponentType<ExplorerProps> | undefined;
-let Callout: ComponentType<CalloutProps> | undefined;
-
-beforeAll(async () => {
-  const explorerPath = './CodeExplorer';
-  const calloutPath = './Callout';
-  const [explorerModule, calloutModule] = await Promise.all([
-    import(/* @vite-ignore */ explorerPath).catch(() => undefined),
-    import(/* @vite-ignore */ calloutPath).catch(() => undefined),
-  ]);
-  CodeExplorer = (explorerModule as { CodeExplorer?: ComponentType<ExplorerProps> } | undefined)?.CodeExplorer;
-  Callout = (calloutModule as { Callout?: ComponentType<CalloutProps> } | undefined)?.Callout;
-});
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { Callout } from './Callout';
+import { CodeExplorer } from './CodeExplorer';
+import type { CodeSnippet } from '../types/course';
 
 const snippet: CodeSnippet = {
   id: 'test-app-js',
@@ -65,7 +34,6 @@ afterEach(() => {
 });
 
 function renderExplorer(value = snippet) {
-  if (!CodeExplorer) throw new Error('CodeExplorer is not implemented');
   return render(<CodeExplorer snippet={value} />);
 }
 
@@ -170,7 +138,6 @@ describe('Callout', () => {
     ['warning', 'คำเตือน'],
     ['success', 'สำเร็จ'],
   ] as const)('labels %s callouts with an accessible heading and text cue', (tone, label) => {
-    if (!Callout) throw new Error('Callout is not implemented');
     render(<Callout tone={tone} title="หัวข้อสำคัญ" text="รายละเอียดที่ผู้เรียนต้องอ่าน" />);
     expect(screen.getByText(label)).toBeVisible();
     expect(screen.getByRole('heading', { name: 'หัวข้อสำคัญ' })).toBeVisible();

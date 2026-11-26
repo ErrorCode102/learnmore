@@ -19,8 +19,7 @@ Content-Type: application/json
 
 {"email":"student@example.com","password":"StudyPass1!"}`,
     [
-      'ระบุ HTTP method POST เพราะ Register สร้าง resource ผู้ใช้ใหม่',
-      'ระบุ path และเวอร์ชันโปรโตคอลที่ Backend รับคำขอ',
+      'ระบุ method POST, path /api/auth/register และ HTTP/1.1 เพื่อส่งคำขอสร้างผู้ใช้ไปยัง Backend',
       'กำหนด host และ port ของเซิร์ฟเวอร์ที่ต้องการติดต่อ',
       'บอก server ว่า body เป็น JSON เพื่อให้ Express อ่านข้อมูลได้',
       'เว้นบรรทัดเพื่อแยก headers ออกจาก body',
@@ -103,6 +102,11 @@ const coreBlueprints: Record<CoreLessonId, CoreBlueprint> = {
           'Client ไม่ควรส่ง user id หรือ role เพื่อขอสิทธิ์; server ต้องอ่านสิทธิ์จาก verified token',
           'Database ไม่ควรถูก browser เชื่อมต่อโดยตรง เพราะ credential และ SQL จะ uncontrolled',
           'ทุก request ที่เปลี่ยนข้อมูลต้องผ่าน validation และ authentication บน Backend',
+        ],
+        flow: [
+          { label: 'Vue Client', detail: 'รับ email/password และแสดง feedback' },
+          { label: 'Express Backend', detail: 'ตรวจ input, hash password และออก JWT' },
+          { label: 'MySQL', detail: 'เก็บ users และ password_hash อย่างปลอดภัย' },
         ],
         snippets: [overviewSnippets[2]],
         callouts: [
@@ -214,11 +218,11 @@ const coreBlueprints: Record<CoreLessonId, CoreBlueprint> = {
         id: 'scaffold-project',
         title: 'สร้าง Backend และ Vue Frontend',
         body: [
-          'สร้าง root ชื่อ auth-lab แล้วแยก Backend/Frontend ชัดเจน Backend ใช้ npm init และ ESM ขณะที่ Frontend ใช้ npm create vite@latest auth-frontend -- --template vue-ts จากนั้นติดตั้ง Axios และ Pinia',
+          'เลือก Git Bash ใน Windows Terminal แล้วสร้าง root ชื่อ auth-lab แยก Backend/Frontend ชัดเจน Backend ใช้ npm init และ ESM ขณะที่ Frontend ใช้ npm create vite@latest auth-frontend -- --template vue-ts จากนั้นติดตั้ง Axios, Pinia และ Tailwind CSS',
           ' dependency ของ Backend ครอบคลุม Express, mysql2, bcryptjs, jsonwebtoken, cors, dotenv, express-validator, helmet และ express-rate-limit ส่วน nodemon เป็น development dependency เท่านั้น',
         ],
         snippets: [setupSnippets[0], setupSnippets[1]],
-        bullets: ['โครงสร้าง: auth-backend/src/{controllers,db,middleware,models,routes,utils}', 'โครงสร้าง: auth-frontend/src/{api,router,stores,views}', 'package-lock.json ของแต่ละฝั่งช่วยให้ npm ci ใน Docker reproducible'],
+        bullets: ['โครงสร้าง: auth-backend/src/{controllers,db,middleware,models,routes,services,utils}', 'โครงสร้าง: auth-frontend/src/{api,router,stores,views}', 'package-lock.json ของแต่ละฝั่งช่วยให้ npm ci ใน Docker reproducible', 'บท Database จะสร้าง users.password_hash และบทถัดไปจะผูก protected /api/auth/me'],
         callouts: [{ tone: 'info', title: 'ไม่สร้างแอปที่สองใน repository นี้', text: 'repository นี้เป็น classroom React; snippet ทั้งหมดคือ source ของโปรเจกต์ Node/Vue ที่ผู้เรียนคัดลอกไปรันนอก classroom' }],
       },
       {
@@ -238,8 +242,8 @@ const coreBlueprints: Record<CoreLessonId, CoreBlueprint> = {
           'app.js สร้าง Express instance และติดตั้ง helmet, CORS allowlist, JSON limit 16kb และ rate limit ก่อน routes ส่วน GET /api/health ตอบ JSON เพื่อตรวจว่า process ทำงานโดยไม่ต้อง login',
           'server.js โหลด app และ MySQL pool แล้วเปิด listener พร้อม SIGINT/SIGTERM shutdown ที่ปิด server และ pool อย่างเรียบร้อย รองรับทั้ง Ctrl+C และ Docker stop',
         ],
-        snippets: [setupSnippets[4], setupSnippets[5]],
-        bullets: ['เริ่ม Backend ด้วย npm run dev จาก auth-backend', 'ตรวจ http://localhost:3000/api/health และคาดว่า status success', 'สร้าง authRoutes.js ในบท Backend ก่อนเมื่อ app import ไฟล์นั้น'],
+        snippets: [setupSnippets[4], setupSnippets[5], setupSnippets[7]],
+        bullets: ['เริ่ม Backend ด้วย npm run dev จาก auth-backend', 'ตรวจ http://localhost:3000/api/health และคาดว่า status success', 'app ยังไม่ import authRoutes เพื่อให้ Setup เริ่มได้; บท Backend จะแทน app.js ด้วยเวอร์ชันที่เมานต์ routes'],
         callouts: [{ tone: 'success', title: 'Verification', text: 'ผลลัพธ์ที่คาดหวังคือ log AuthLab API ทำงานที่ http://localhost:3000 และ curl health ตอบ 200' }],
       },
       {
@@ -249,7 +253,7 @@ const coreBlueprints: Record<CoreLessonId, CoreBlueprint> = {
           'Vite ทำงานที่ port 5173 และ proxy path /api ไปยัง localhost:3000 ทำให้ browser เห็น request เป็น same-origin และลด CORS ขณะ development; CLIENT_ORIGIN ของ Backend จึงเป็น http://localhost:5173',
           'restart Vite หลังแก้ config จากนั้น Frontend เรียก relative /api ได้โดยไม่ hardcode port ของ Backend ใน production nginx จะทำหน้าที่ proxy แทน Vite',
         ],
-        snippets: [setupSnippets[6]],
+        snippets: [setupSnippets[6], setupSnippets[8]],
         callouts: [{ tone: 'info', title: 'เส้นทางเดียวกัน', text: 'Vite proxy ไม่เปลี่ยน endpoint; /api/auth/login ต่อไปยัง Express route /login ใต้ prefix /api/auth เหมือนเดิม' }],
       },
     ],
@@ -332,7 +336,7 @@ const coreBlueprints: Record<CoreLessonId, CoreBlueprint> = {
           'Register normalize email, bcrypt.hash ด้วย cost 12, ตรวจ existing user และ INSERT หากไม่ซ้ำ ถ้า unique constraint ชนเพราะ race คืน 409 เช่นกัน Login ใช้ bcrypt.compare และรวม user ไม่พบ/password ผิดเป็น 401 ข้อความเดียวกัน',
           'Controller อ่าน validationResult และตอบ 422 พร้อม field errors เมื่อข้อมูลไม่ถูกต้อง ส่วน error ที่ไม่คาดหมายส่งต่อไป global handler ซึ่งตอบ 500 โดยไม่ส่ง stack trace ให้ client',
         ],
-        snippets: [backendSnippets[5]],
+        snippets: [backendSnippets[6]],
         bullets: ['201 ใช้เมื่อสร้างผู้ใช้ใหม่', '409 ใช้เมื่อ email มีอยู่แล้ว', '401 ใช้เมื่อ credential หรือ token ไม่ถูกต้อง', '422 ใช้เมื่อ input ไม่ผ่าน validation'],
         callouts: [{ tone: 'success', title: 'Password handling', text: 'plaintext password ถูกใช้เพียงช่วงสั้นใน memory ของ request และไม่ถูกบันทึกใน database หรือ log' }],
       },
@@ -341,9 +345,9 @@ const coreBlueprints: Record<CoreLessonId, CoreBlueprint> = {
         title: 'JWT middleware และ protected /me route',
         body: [
           'jwt.sign สร้าง access token ด้วย sub, expiresIn, HS256, issuer และ audience ส่วน jwt.verify ปฏิเสธ token ที่ลายเซ็นผิด หมดอายุหรือมี claims ไม่ตรง พร้อม algorithm whitelist',
-          'requireAuth อ่าน Authorization: Bearer <token> และแนบ id จาก verified payload เข้า req.user /me ใช้ id นี้ query ผู้ใช้จาก database แทนการเชื่อม user id ที่ client ส่งมา',
+          'requireAuth อ่าน Authorization: Bearer <token> และแนบ id จาก verified payload เข้า req.user /me ใช้ id นี้ query ผู้ใช้จาก database แทนการเชื่อม user id ที่ client ส่งมา พร้อมแทน app.js ด้วยเวอร์ชันที่ import และเมานต์ authRoutes',
         ],
-        snippets: [backendSnippets[4], backendSnippets[6], backendSnippets[5]],
+        snippets: [backendSnippets[4], backendSnippets[5], backendSnippets[7], backendSnippets[8]],
         callouts: [{ tone: 'warning', title: 'JWT ไม่ได้ encrypt', text: 'payload อ่านได้ด้วยทุกคนที่ถือ token ดังนั้นใส่เฉพาะ identifier และ claims ที่จำเป็น ห้ามใส่ password, secret หรือข้อมูลส่วนบุคคลมากเกินจำเป็น' }],
       },
     ],
@@ -392,7 +396,7 @@ const coreBlueprints: Record<CoreLessonId, CoreBlueprint> = {
         title: 'CORS, rate limit และ DevTools Network',
         body: [
           'CORS กำหนดว่าอนุญาต origin ไหนให้อ่าน response ข้าม origin; มันไม่ใช่ authentication Vite proxy ทำให้ development เป็น same-origin แต่การเรียก Backend ตรง仍需 CLIENT_ORIGIN ให้ตรง',
-          'app มี global /api rate limit และ authLimiter บน /api/auth เพื่อลด brute force DevTools ช่วยยืนยัน URL, method, payload, status และ response จริงที่ browser ส่ง',
+          'app มี global /api rate limit และ authLimiter ที่สร้างด้วย rateLimit(...) บน /api/auth เพื่อลด brute force โดย cors middleware จำกัด origin ที่อ่าน response ได้ ส่วน DevTools ช่วยยืนยัน URL, method, payload, status และ response จริงที่ browser ส่ง',
         ],
         snippets: [apiSnippets[3]],
         bullets: ['Network > Fetch/XHR ใช้ตรวจ request ของ Vue', 'RateLimit headers บอกเพดานและเวลาที่จะรีเซ็ต', '429 แปลว่าลองใหม่ภายหลัง ไม่ใช่ credential ผิด', ' production ต้องตั้ง trust proxy ถูกต้องถึงจะนับ IP ของ client ได้ถูกต้อง'],
@@ -423,7 +427,7 @@ const coreBlueprints: Record<CoreLessonId, CoreBlueprint> = {
         title: 'ตั้งค่า Router guard และ Vue entry point',
         body: [
           'Router กำหนด /login, /register และ /dashboard พร้อม meta guestOnly/requiresAuth beforeEach redirect ผู้ที่ไม่มี token ไป Login และผู้ที่ login แล้วออกจาก auth forms',
-          'main.js ลงทะเบียน Pinia ก่อน Router guard เรียก store และ mount App.vue ซึ่งแสดง RouterView; App shell เป็นจุดรวม styling และ navigation ในโปรเจกต์ที่สอน',
+          'main.ts ลงทะเบียน Pinia ก่อน Router guard เรียก store และ mount App.vue ซึ่งแสดง RouterView; ใช้ชื่อ main.ts ให้ตรงกับ index.html ของ vue-ts scaffold และ import style.css ที่โหลด Tailwind',
         ],
         snippets: [frontendSnippets[2], frontendSnippets[3], frontendSnippets[4]],
         bullets: ['Router guard เป็น UX ไม่ใช่การตรวจสอบสิทธิ์จริง', 'Dashboard ต้องเรียก /me เมื่อ mount เพื่อยืนยัน token กับ server', 'Backend ต้องป้องกัน /me ไม่ว่าจะเข้าผ่าน router ใด'],
@@ -490,7 +494,7 @@ const coreBlueprints: Record<CoreLessonId, CoreBlueprint> = {
           'Thunder Client เหมาะกับอ่าน/แก้ .http files และ rerun กรณีต่าง ๆ ส่วน curl เหมาะกับ automation ใน terminal หรือ CI; ทั้งสองวิธีต้องส่ง JSON content type และอ่าน status/header/response ให้ครบ',
           'อย่าเก็บ access token จริงใน .http หรือ script ที่ commit; ใช้ placeholder แล้วคัดลอกจาก response ชั่วคราว และ mask token ก่อนแชร์หลักฐาน',
         ],
-        snippets: [apiSnippets[0], apiSnippets[1]],
+        snippets: [testingSnippets[4]],
         bullets: ['บันทึก test case ID, input, expected และ actual', 'แยก test database ออกจาก production', 'จำกัด rate limit หรือรอ window  reset เมื่อทดสอบ 429', 'ตรวจ duplicate email ก่อนเชื่อว่ารัน test ได้ผลผิดปกติ'],
       },
       {

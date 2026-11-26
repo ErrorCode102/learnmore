@@ -10,6 +10,7 @@ npm --version
 where node
 mysql --version
 git --version
+where git
 code --version`,
     [
       'ตรวจสอบเวอร์ชัน Node.js โดยควรใช้ LTS ที่แนะนำปัจจุบันและต้องไม่ต่ำกว่า reference floor 18',
@@ -17,6 +18,7 @@ code --version`,
       'แสดงตำแหน่งไฟล์ executable ของ Node.js เพื่อยืนยันว่าใช้ตัวติดตั้งไม่ใช่โปรแกรมอื่น',
       'ตรวจสอบว่า MySQL หรือ MariaDB client มีคำสั่ง mysql ใน PATH ของ Windows',
       'ตรวจสอบการติดตั้ง Git ซึ่งใช้สำหรับควบคุมเวอร์ชันและClone โปรเจกต์',
+      'แสดงตำแหน่ง Git executable เพื่อยืนยันว่า Terminal เรียกตัวติดตั้งที่ต้องการ',
       'ตรวจสอบว่า VS Code CLI ทำงานได้ เพื่อเปิดโปรเจกต์จาก Terminal ได้',
     ],
     'เปิด Windows Terminal แล้วพิมพ์ทีละคำสั่ง บันทึกผลลัพธ์ที่ได้',

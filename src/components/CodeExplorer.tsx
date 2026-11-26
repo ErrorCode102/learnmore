@@ -31,7 +31,7 @@ function renderTokens(tokens: TokenStream): ReactNode {
 
 function HighlightedLine({ line, language }: { line: string; language: CodeLanguage }) {
   const grammar = grammarFor(language);
-  const tokens = grammar ? Prism.tokenize(line, grammar, language) : line;
+  const tokens = grammar ? Prism.tokenize(line, grammar) : line;
   return <>{renderTokens(tokens)}</>;
 }
 

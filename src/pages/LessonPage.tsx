@@ -7,17 +7,20 @@ import {
   Clock3,
   ListChecks,
 } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
+import { Callout } from '../components/Callout';
+import { CodeExplorer } from '../components/CodeExplorer';
 import { useClassroomProgress } from '../context/ProgressContext';
-import { getLessonsForLevel, getLessonSummary } from '../data/course';
+import { getLessonContent, getLessonsForLevel } from '../data/course';
 import type { LessonId } from '../types/course';
 
 export function LessonPage() {
   const { lessonId } = useParams();
   const { level, progress, toggleLesson, visitLesson } = useClassroomProgress();
   const lessons = getLessonsForLevel(level);
-  const lesson = getLessonSummary(level, lessonId as LessonId);
+  const lesson = getLessonContent(level, lessonId as LessonId);
+  const [activeSectionId, setActiveSectionId] = useState('');
 
   useEffect(() => {
     if (lesson) {
@@ -25,8 +28,39 @@ export function LessonPage() {
     }
   }, [lesson, visitLesson]);
 
+  useEffect(() => {
+    if (!lesson) return;
+    setActiveSectionId(lesson.sections[0]?.id ?? '');
+    if (typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible[0]) {
+          setActiveSectionId(visible[0].target.id);
+        }
+      },
+      { rootMargin: '-112px 0px -65% 0px', threshold: [0, 0.25, 1] },
+    );
+
+    for (const section of lesson.sections) {
+      const element = document.getElementById(section.id);
+      if (element) observer.observe(element);
+    }
+
+    return () => observer.disconnect();
+  }, [lesson]);
+
   if (!lesson) {
     return <Navigate to="/" replace />;
+  }
+
+  function openSection(sectionId: string) {
+    setActiveSectionId(sectionId);
+    document.getElementById(sectionId)?.scrollIntoView({ block: 'start' });
+    document.getElementById(`${sectionId}-title`)?.focus({ preventScroll: true });
   }
 
   const currentIndex = lessons.findIndex((candidate) => candidate.id === lesson.id);
@@ -128,6 +162,32 @@ export function LessonPage() {
               })}
             </ol>
           </nav>
+
+          <nav aria-label="เนื้อหาในบทเรียน" className="mt-6 border-t border-line pt-5">
+            <h3 className="text-sm font-semibold">สารบัญในบทเรียน</h3>
+            <ol className="mt-3 space-y-1">
+              {lesson.sections.map((section) => {
+                const isActive = activeSectionId === section.id;
+                return (
+                  <li key={section.id}>
+                    <button
+                      type="button"
+                      aria-controls={section.id}
+                      aria-current={isActive ? 'location' : undefined}
+                      onClick={() => openSection(section.id)}
+                      className={`flex min-h-10 w-full items-center rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                        isActive
+                          ? 'bg-soft-brand font-semibold text-brand'
+                          : 'text-muted hover:bg-canvas hover:text-ink'
+                      }`}
+                    >
+                      {section.title}
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+          </nav>
         </aside>
 
         <div className="order-last min-w-0 space-y-6 lg:order-first">
@@ -164,7 +224,7 @@ export function LessonPage() {
           <section
             id="lesson-content"
             aria-labelledby="lesson-content-title"
-            className="scroll-mt-28 rounded-2xl border border-line bg-surface p-6 sm:p-8"
+            className="rounded-2xl border border-line bg-surface p-6 sm:p-8"
           >
             <p className="text-[10px] font-semibold tracking-[0.18em] text-brand">
               LESSON CONTENT
@@ -172,11 +232,98 @@ export function LessonPage() {
             <h2 id="lesson-content-title" className="mt-2 text-2xl font-semibold tracking-[-0.025em]">
               เนื้อหาบทเรียน
             </h2>
-            <div className="mt-5 rounded-2xl border border-dashed border-brand/25 bg-soft-brand/45 p-5">
-              <p className="text-sm leading-7 text-muted">
-                กำลังเตรียมเนื้อหาอธิบายและตัวอย่างสำหรับบทเรียนนี้
-                เพื่อเชื่อมโยงแนวคิดเข้ากับขั้นตอนการปฏิบัติและจุดตรวจความเข้าใจ
-              </p>
+            <p className="mt-5 text-base leading-8 text-ink">{lesson.intro}</p>
+
+            <div className="mt-10 space-y-9">
+              {lesson.sections.map((section, sectionIndex) => (
+                <article
+                  key={section.id}
+                  id={section.id}
+                  aria-labelledby={`${section.id}-title`}
+                  className="scroll-mt-28 border-t border-line pt-8 first:border-t-0 first:pt-0"
+                >
+                  <p className="font-mono text-[11px] font-semibold text-brand">
+                    {String(sectionIndex + 1).padStart(2, '0')}
+                  </p>
+                  <h3
+                    id={`${section.id}-title`}
+                    tabIndex={-1}
+                    className="mt-2 text-xl font-semibold tracking-[-0.02em] outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-4"
+                  >
+                    {section.title}
+                  </h3>
+
+                  <div className="mt-4 space-y-4">
+                    {section.body.map((paragraph) => (
+                      <p key={paragraph} className="text-sm leading-7 text-muted">
+                        {paragraph}
+                      </p>
+                    ))}
+                  </div>
+
+                  {section.flow && (
+                    <ol
+                      aria-label="ภาพรวมเส้นทางข้อมูล"
+                      className="mt-6 grid gap-3 md:grid-cols-3"
+                    >
+                      {section.flow.map((step, index) => (
+                        <li
+                          key={step.label}
+                          className="relative rounded-xl border border-line bg-canvas p-4"
+                        >
+                          <p className="font-mono text-[10px] font-semibold text-brand">
+                            STEP {index + 1}
+                          </p>
+                          <p className="mt-2 text-sm font-semibold text-ink">{step.label}</p>
+                          <p className="mt-1 text-xs leading-6 text-muted">{step.detail}</p>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+
+                  {section.bullets && section.bullets.length > 0 && (
+                    <ul className="mt-5 space-y-2.5 rounded-xl bg-canvas p-4">
+                      {section.bullets.map((bullet) => (
+                        <li key={bullet} className="flex items-start gap-2.5 text-sm leading-7 text-ink">
+                          <CheckCircle2
+                            aria-hidden="true"
+                            className="mt-1 h-4 w-4 shrink-0 text-brand"
+                          />
+                          {bullet}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  {section.snippets && section.snippets.length > 0 && (
+                    <div className="mt-6 space-y-5">
+                      {section.snippets.map((snippet) => (
+                        <CodeExplorer key={snippet.id} snippet={snippet} />
+                      ))}
+                    </div>
+                  )}
+
+                  {section.callouts && section.callouts.length > 0 && (
+                    <div className="mt-6 space-y-3">
+                      {section.callouts.map((callout) => (
+                        <Callout key={`${callout.tone}-${callout.title}`} {...callout} />
+                      ))}
+                    </div>
+                  )}
+
+                  {level === 'diploma' && section.diplomaNote && (
+                    <aside
+                      aria-label="หมายเหตุระดับปวส."
+                      className="mt-6 rounded-xl border border-brand/20 bg-soft-brand/50 p-4"
+                    >
+                      <p className="text-[10px] font-semibold tracking-[0.16em] text-brand">
+                        DIPLOMA NOTE
+                      </p>
+                      <p className="mt-2 text-sm leading-7 text-ink">{section.diplomaNote}</p>
+                    </aside>
+                  )}
+                </article>
+              ))}
             </div>
           </section>
 
@@ -191,9 +338,18 @@ export function LessonPage() {
             <h2 id="lesson-checkpoint-title" className="mt-2 text-2xl font-semibold tracking-[-0.025em]">
               จุดตรวจความเข้าใจ
             </h2>
-            <p className="mt-4 text-sm leading-7 text-muted">
-              บทเรียนนี้จะเชื่อมต่อกับแบบฝึกหัดและคำถามสรุป เพื่อช่วยตรวจสอบว่าคุณเข้าใจแนวคิดสำคัญก่อนไปต่อบทถัดไป
-            </p>
+            <p className="mt-4 text-sm leading-7 text-muted">{lesson.checkpoint.summary}</p>
+            <ul aria-label="เช็กลิสต์จุดตรวจความเข้าใจ" className="mt-5 space-y-3">
+              {lesson.checkpoint.checklist.map((item) => (
+                <li key={item} className="flex items-start gap-3 text-sm leading-7 text-ink">
+                  <CheckCircle2
+                    aria-hidden="true"
+                    className="mt-1 h-4 w-4 shrink-0 text-coral"
+                  />
+                  {item}
+                </li>
+              ))}
+            </ul>
           </section>
 
           <section

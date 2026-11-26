@@ -54,24 +54,26 @@ export function configureSecurity(app) {
   }));
 }`,
     [
-      'นำเข้า helmet, cors และ rateLimit สำหรับเสริม configuration ใน app.js',
-      'เว้นบรรทัดก่อนฟังก์ชัน config',
-      'ส่งออกฟังก์ชันที่รับ Express app แล้วติดตั้ง security middleware',
-      'อ่าน origin allowlist จาก env โดยไม่ hardcode โปรเจกต์ production',
-      'แยก string ด้วย comma เพื่อรองรับเว็บไซต์หลาย origin',
-      'ตัด whitespace รอบ origin เพื่อหลีกเลี่ยงค่าที่ไม่ตรง',
-      'กรองค่าว่างออกเพื่อไม่เพิ่ม origin ที่อันตรายโดยไม่ตั้งใจ',
-      'เว้นบรรทัดก่อนการติดตั้ง middleware',
-      'ปิด header X-Powered-By เพื่อลดข้อมูล technology ที่ server เปิดเผย',
-      'เพิ่ม helmet security headers ให้ response ทั้งหมด',
-      'เปิด CORS เฉพาะ allowlist และอนุญาต credentials สำหรับ refresh cookie',
-      'ติดตั้ง auth rate limiter แยกจาก global API limiter',
-      'ตั้งหน้าต่าง 15 นาทีสำหรับการโจมตีแบบ brute force',
-      'จำกัด 10 requests ต่อ IP เป็น baseline ที่ต้องปรับตามผู้ใช้จริง',
-      'ส่ง standard rate limit headers เพื่อ client ปรับพฤติกรรมได้',
-      'ปิด legacy headers เพื่อไม่ซ้ำข้อมูล',
-      'ปิด rate limit config',
-      'ปิดฟังก์ชัน configureSecurity',
+      "นำเข้า helmet เพื่อเพิ่ม security headers แก่ response",
+      "นำเข้า cors เพื่อจำกัด origin ที่เรียก API ข้าม domain ได้",
+      "นำเข้า rateLimit เพื่อลด brute force บน authentication routes",
+      "เว้นบรรทัดก่อนฟังก์ชัน config",
+      "ส่งออกฟังก์ชันที่รับ Express app แล้วติดตั้ง security middleware",
+      "อ่าน origin allowlist จาก env โดยไม่ hardcode โปรเจกต์ production",
+      "แยก string ด้วย comma เพื่อรองรับเว็บไซต์หลาย origin",
+      "ตัด whitespace รอบ origin เพื่อหลีกเลี่ยงค่าที่ไม่ตรง",
+      "กรองค่าว่างออกเพื่อไม่เพิ่ม origin ที่อันตรายโดยไม่ตั้งใจ",
+      "เว้นบรรทัดก่อนการติดตั้ง middleware",
+      "ปิด header X-Powered-By เพื่อลดข้อมูล technology ที่ server เปิดเผย",
+      "เพิ่ม helmet security headers ให้ response ทั้งหมด",
+      "เปิด CORS เฉพาะ allowlist และอนุญาต credentials สำหรับ refresh cookie",
+      "ติดตั้ง auth rate limiter แยกจาก global API limiter",
+      "ตั้งหน้าต่าง 15 นาทีสำหรับการโจมตีแบบ brute force",
+      "จำกัด 10 requests ต่อ IP เป็น baseline ที่ต้องปรับตามผู้ใช้จริง",
+      "ส่ง standard rate limit headers เพื่อ client ปรับพฤติกรรมได้",
+      "ปิด legacy headers เพื่อไม่ซ้ำข้อมูล",
+      "ปิด rate limit config",
+      "ปิดฟังก์ชัน configureSecurity",
     ],
     'CORS ไม่ใช่ authentication; ยังต้องตรวจ token และ origin ของ state-changing cookie requests',
   ),
@@ -143,14 +145,34 @@ export async function issueRefreshToken(res, userId) {
 
 export async function rotateRefreshToken(rawToken) {
   if (!rawToken) return null;
-  const [rows] = await pool.execute(
-    'SELECT id, user_id, expires_at, revoked_at FROM refresh_tokens WHERE token_hash = ? LIMIT 1',
-    [hashToken(rawToken)],
-  );
-  const record = rows[0];
-  if (!record || record.revoked_at || record.expires_at <= new Date()) return null;
-  await pool.execute('UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = ?', [record.id]);
-  return record.user_id;
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [rows] = await connection.execute(
+      'SELECT id, user_id, expires_at, revoked_at FROM refresh_tokens WHERE token_hash = ? LIMIT 1 FOR UPDATE',
+      [hashToken(rawToken)],
+    );
+    const record = rows[0];
+    if (!record || record.revoked_at || record.expires_at <= new Date()) {
+      await connection.rollback();
+      return null;
+    }
+    const [result] = await connection.execute(
+      'UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = ? AND revoked_at IS NULL AND expires_at > NOW()',
+      [record.id],
+    );
+    if (result.affectedRows !== 1) {
+      await connection.rollback();
+      return null;
+    }
+    await connection.commit();
+    return record.user_id;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 
 export async function revokeRefreshToken(rawToken) {
@@ -158,45 +180,68 @@ export async function revokeRefreshToken(rawToken) {
   await pool.execute('UPDATE refresh_tokens SET revoked_at = NOW() WHERE token_hash = ? AND revoked_at IS NULL', [hashToken(rawToken)]);
 }`,
     [
-      'นำเข้า crypto สำหรับสร้าง random token และคำนวณ hash แบบ one-way',
-      'นำเข้า MySQL pool เพื่อบันทึกและ revoke refresh records',
-      'กำหนดอายุ refresh token 7 วันสำหรับตัวอย่างการฝึก',
-      'แปลงอายุวันเป็น milliseconds เพื่อใช้ทั้ง cookie และ database',
-      'เว้นบรรทัดก่อน helper',
-      'ประกาศฟังก์ชัน hash token เพื่อไม่เก็บ raw token ในฐานข้อมูล',
-      'สร้าง SHA-256 digest แบบ hex จาก token ที่ได้จาก cookie',
-      'คืน hash คงที่ความยาว 64 ตัวให้ตรงกับ CHAR(64)',
-      'เว้นบรรทัดก่อน issue flow',
-      'ส่งออกฟังก์ชันออก refresh token ใหม่โดยรับ response object และ user id',
-      'สร้าง token สุ่ม 32 bytes ด้วย cryptographic RNG',
-      'แปลง bytes เป็น hex string ที่ปลอดภัยในการส่งผ่าน cookie',
-      'คำนวณเวลาหมดอายุแบบ absolute จากเวลาปัจจุบัน',
-      'INSERT hash, user id และ expiry ด้วย parameterized query',
-      'ส่ง token hash แทน raw token และ user id เป็น parameters',
-      'ตั้ง HttpOnly cookie เพื่อ JavaScript ใน browser อ่าน token ไม่ได้',
-      'เปิด Secure เฉพาะ production เพื่อ cookie เดินทางผ่าน HTTPS',
-      'ใช้ SameSite=Lax เพื่อลด CSRF ข้าม site สำหรับคำขอ POST',
-      'จำกัด cookie path ที่ /api/auth เท่านั้นเพื่อไม่ส่งไปยัง static files',
-      'กำหนด maxAge ให้ cookie หมดอายุตามเดียวกับ database record',
-      'ปิด cookie options',
-      'ปิด issueRefreshToken function',
-      'เว้นบรรทัดก่อน rotation',
-      'ส่งออกฟังก์ชันตรวจและหมุน refresh token',
-      'คืน null ทันทีเมื่อ cookie ไม่มีเพื่อให้ route ตอบ 401',
-      'ค้นหา refresh record ด้วย hash แทน raw token',
-      'SELECT expiry และ revoked_at เพื่อตรวจสิทธิ์ก่อนออก token ใหม่',
-      'ส่ง hash เป็น parameter ในการ query',
-      'อ่าน record แรวที่ query พบหรือ undefined',
-      'ปฏิเสธ token ที่ไม่มี ถูก revoke หรือหมดอายุ',
-      'บันทึก revoked_at ของ token เก่าก่อนออก token ใหม่',
-      'ส่ง record id เป็น parameter ของ UPDATE',
-      'คืน user id เพื่อ controller สร้าง access token ใหม่',
-      'ปิด rotateRefreshToken function',
-      'เว้นบรรทัดก่อน logout/revocation',
-      'ส่งออกฟังก์ชัน revoke สำหรับ Log out หรือตรวจพบ token reuse',
-      'ไม่ทำอะไรเมื่อไม่มี raw token เพราะไม่มีรายการให้ revoke',
-      'UPDATE เฉพาะรายการที่ยังไม่ revoke ด้วย parameterized query',
-      'ปิด revokeRefreshToken function',
+      "นำเข้า crypto สำหรับสร้าง random token และคำนวณ hash แบบ one-way",
+      "นำเข้า MySQL pool เพื่อบันทึกและ revoke refresh records",
+      "เว้นบรรทัดแยก dependency ออกจาก configuration",
+      "กำหนดอายุ refresh token 7 วันสำหรับตัวอย่างการฝึก",
+      "แปลงอายุวันเป็น milliseconds เพื่อใช้ทั้ง cookie และ database",
+      "เว้นบรรทัดก่อน helper",
+      "ประกาศฟังก์ชัน hash token เพื่อไม่เก็บ raw token ในฐานข้อมูล",
+      "คืน SHA-256 digest แบบ hex ความยาว 64 ตัวให้ตรงกับ CHAR(64)",
+      "ปิด helper hashToken",
+      "เว้นบรรทัดก่อน issue flow",
+      "ส่งออกฟังก์ชันออก refresh token ใหม่โดยรับ response object และ user id",
+      "สร้าง token สุ่ม 32 bytes แล้วแปลงเป็น hex string สำหรับ cookie",
+      "คำนวณเวลาหมดอายุแบบ absolute จากเวลาปัจจุบัน",
+      "เปิด pool.execute เพื่อ INSERT refresh record",
+      "กำหนดคอลัมน์ token_hash, user_id และ expires_at พร้อม placeholder สามตัว",
+      "ส่ง token hash แทน raw token และ user id เป็น parameters",
+      "ปิด pool.execute พร้อมรอการบันทึก record",
+      "เปิด res.cookie เพื่อส่ง refresh token กลับไปยัง browser",
+      "ตั้ง HttpOnly cookie เพื่อ JavaScript ใน browser อ่าน token ไม่ได้",
+      "เปิด Secure เฉพาะ production เพื่อ cookie เดินทางผ่าน HTTPS",
+      "ใช้ SameSite=Lax เพื่อลดการส่ง cookie ข้าม site แต่ต้องตรวจ Origin เพิ่ม เพราะ cookie ไม่ถูกส่งบน cross-site POST โดยทั่วไป",
+      "จำกัด cookie path ที่ /api/auth เท่านั้นเพื่อไม่ส่งไปยัง static files",
+      "กำหนด maxAge ให้ cookie หมดอายุตามเดียวกับ database record",
+      "ปิด cookie options",
+      "ปิด issueRefreshToken function",
+      "เว้นบรรทัดก่อน rotation",
+      "ส่งออกฟังก์ชันตรวจและหมุน refresh token แบบ atomic",
+      "คืน null ทันทีเมื่อ cookie ไม่มีเพื่อให้ route ตอบ 401",
+      "ยืม connection จาก pool เพื่อให้ transaction ใช้ connection เดียวกัน",
+      "เปิด try block สำหรับ transaction และ database errors",
+      "เริ่ม transaction ก่อนอ่านและแก้ไข refresh record",
+      "เปิด connection.execute เพื่อค้นหา record พร้อมรอผลลัพธ์",
+      "SELECT ข้อมูลที่ต้องตรวจด้วย parameterized query และ FOR UPDATE เพื่อล็อกแถว",
+      "ส่ง hash เป็น parameter ในการ query",
+      "ปิด connection.execute และ destructure แถวผลลัพธ์",
+      "อ่าน record แรวที่ query พบหรือ undefined",
+      "ตรวจว่า record มีจริง ไม่ถูก revoke และยังไม่หมดอายุ",
+      "rollback transaction ก่อนคืน null เพื่อไม่คง lock ไว้",
+      "คืน null เมื่อ refresh token ใช้ไม่ได้",
+      "ปิด if ของ token ที่ไม่ผ่านการตรวจ",
+      "เปิด connection.execute สำหรับ UPDATE แบบมีเงื่อนไข",
+      "ตั้ง revoked_at พร้อมตรวจ revoked_at IS NULL และ expires_at > NOW() อีกครั้ง",
+      "ส่ง id เป็น parameter โดยไม่ concat ค่าเข้า SQL",
+      "ปิด UPDATE พร้อมเก็บผลจำนวนแถวที่เปลี่ยนจริง",
+      "ตรวจว่าการ revoke สำเร็จเพียงหนึ่ง record",
+      "rollback เมื่อเงื่อนไข race ทำให้ไม่มีแถวผ่านการอัปเดต",
+      "คืน null เมื่อไม่สามารถยืนยันการหมุน token ได้",
+      "ปิด if ของผล UPDATE",
+      "commit transaction เมื่อการ revoke สำเร็จเพื่อปล่อย lock ถาวร",
+      "คืน user id เพื่อ controller สร้าง access token ใหม่",
+      "เริ่ม catch เมื่อ database หรือ transaction ล้มเหลว",
+      "rollback transaction ที่ยังไม่ commit ก่อนส่ง error ต่อ",
+      "โยน error ต่อให้ route และ global handler จัดการ",
+      "เริ่ม finally เพื่อคืน resource ในทุกเส้นทาง",
+      "คืน connection ลง pool ทั้งสำเร็จและล้มเหลว",
+      "ปิด finally block",
+      "ปิด rotateRefreshToken function",
+      "เว้นบรรทัดก่อน logout/revocation",
+      "ส่งออกฟังก์ชัน revoke สำหรับ Log out หรือตรวจพบ token reuse",
+      "ไม่ทำอะไรเมื่อไม่มี raw token เพราะไม่มีรายการให้ revoke",
+      "UPDATE เฉพาะรายการที่ยังไม่ revoke ด้วย parameterized query",
+      "ปิด revokeRefreshToken function",
     ],
     'Production ควร revoke token family ทั้งหมดเมื่อตรวจพบ reuse ของ token ที่หมุนแล้ว',
   ),
@@ -212,7 +257,16 @@ import { issueRefreshToken, revokeRefreshToken, rotateRefreshToken } from '../se
 const router = Router();
 const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/api/auth' };
 
-router.post('/refresh', cookieParser(), async (req, res, next) => {
+function requireTrustedOrigin(req, res, next) {
+  const origin = req.get('origin');
+  const allowedOrigins = (process.env.CLIENT_ORIGINS ?? '').split(',').map((item) => item.trim());
+  if (origin && !allowedOrigins.includes(origin)) {
+    return res.status(403).json({ status: 'error', message: 'Origin ไม่อนุญาต', data: null });
+  }
+  return next();
+}
+
+router.post('/refresh', requireTrustedOrigin, cookieParser(), async (req, res, next) => {
   try {
     const userId = await rotateRefreshToken(req.cookies.refresh_token);
     if (!userId) {
@@ -227,7 +281,7 @@ router.post('/refresh', cookieParser(), async (req, res, next) => {
   }
 });
 
-router.post('/logout', cookieParser(), async (req, res, next) => {
+router.post('/logout', requireTrustedOrigin, cookieParser(), async (req, res, next) => {
   try {
     await revokeRefreshToken(req.cookies.refresh_token);
     res.clearCookie('refresh_token', cookieOptions);
@@ -239,41 +293,51 @@ router.post('/logout', cookieParser(), async (req, res, next) => {
 
 export default router;`,
     [
-      'นำเข้า Router สำหรับแยก refresh และ logout routes',
-      'นำเข้า cookie-parser เพื่ออ่าน refresh_token จาก Cookie header อย่างปลอดภัย',
-      'นำเข้า signAccessToken เพื่อออก access token สั้นหลัง rotate สำเร็จ',
-      'นำเข้า service ที่ดูแลการออก หมุน และ revoke refresh token',
-      'เว้นบรรทัดก่อนสร้าง router',
-      'สร้าง router instance สำหรับเมานต์ใต้ /api/auth',
-      'กำหนด cookie options เดียวกันสำหรับ clearCookie เพื่อให้ path/domain ตรงกัน',
-      'เปิด HttpOnly option ใน clearCookie config',
-      'กำหนด Secure ตาม production mode',
-      'กำหนด SameSite=Lax ให้ตรงกับ cookie ที่ออกไว้',
-      'จำกัด path ของ cookie ที่ /api/auth',
-      'เว้นบรรทัดก่อน refresh route',
-      'เปิด POST /refresh และใช้ cookieParser เฉพาะ route นี้',
-      'เริ่ม try block สำหรับ database errors ของ rotation',
-      'อ่าน cookie แล้วตรวจ expiry/revocation และ revoke token เก่า',
-      'ตอบ 401 เมื่อ refresh token ไม่ถูกต้องหรือถูกใช้แล้ว',
-      'ล้าง cookie ที่ไม่สามารถใช้งานต่อได้',
-      'ส่ง generic message ให้ client กลับไป Login',
-      'ออก refresh token ใหม่และตั้ง cookie หลัง rotate สำเร็จ',
-      'สร้าง access token 15 นาทีจาก user id ที่ยืนยันแล้ว',
-      'ตอบ 200 พร้อม access token ใน JSON แต่ไม่ส่ง refresh token ให้ JavaScript',
-      'จับ error ของ service แล้วส่งต่อไป global handler',
-      'ปิด refresh handler',
-      'เว้นบรรทัดก่อน logout route',
-      'เปิด POST /logout พร้อม cookieParser',
-      'เริ่ม try block สำหรับการ revoke',
-      'revoke refresh record ก่อนตอบว่าออกจากระบบสำเร็จ',
-      'ล้าง cookie ด้วย options เดียวกันกับตอนออก token',
-      'ตอบ 200 ด้วย response shape มาตรฐานและ data null',
-      'ส่ง error ต่อ global handler หาก database ล้มเหลว',
-      'ปิด logout handler',
-      'เว้นบรรทัดก่อน export',
-      'ส่ง router ไปเมานต์ใน app หลัง npm install cookie-parser',
+      "นำเข้า Router สำหรับแยก refresh และ logout routes",
+      "นำเข้า cookie-parser ที่ติดตั้งในบท Setup เพื่ออ่าน refresh_token จาก Cookie header",
+      "นำเข้า signAccessToken เพื่อออก access token สั้นหลัง rotate สำเร็จ",
+      "นำเข้า service ที่ดูแลการออก หมุน และ revoke refresh token",
+      "เว้นบรรทัดก่อนสร้าง router",
+      "สร้าง router instance สำหรับเมานต์ใต้ /api/auth",
+      "กำหนด cookie options เหมือนตอนออก token รวม HttpOnly, Secure, SameSite และ path เพื่อ clearCookie ตรงกัน",
+      "เว้นบรรทัดก่อน middleware ตรวจ Origin",
+      "ประกาศ middleware สำหรับคำขอที่เปลี่ยนสถานะโดยใช้ cookie",
+      "อ่าน Origin header ที่ browser แนบมา",
+      "แยก CLIENT_ORIGINS เป็น allowlist และ trim ค่าแต่ละ origin",
+      "ปฏิเสธ Origin ที่ส่งมาและไม่อยู่ใน allowlist",
+      "ตอบ 403 ก่อนอ่านหรือเปลี่ยน refresh token เมื่อ Origin ไม่เชื่อถือ",
+      "ปิด if ของ Origin ที่ไม่อนุญาต",
+      "อนุญาตให้ไปต่อเมื่อไม่มี Origin หรือ Origin ตรง allowlist",
+      "ปิด requireTrustedOrigin middleware",
+      "เว้นบรรทัดก่อน refresh route",
+      "เปิด POST /refresh โดยตรวจ Origin และอ่าน cookie ก่อน handler",
+      "เริ่ม try block สำหรับ database errors ของ rotation",
+      "อ่าน cookie แล้วตรวจ expiry/revocation และ revoke token เก่าแบบ atomic",
+      "ตรวจ userId ที่ service คืนมาเมื่อ refresh token ใช้ไม่ได้",
+      "ล้าง cookie ที่ไม่สามารถใช้งานต่อได้",
+      "ส่ง generic message ให้ client กลับไป Login",
+      "ปิด if ของ refresh token ที่ไม่ถูกต้อง",
+      "ออก refresh token ใหม่และตั้ง cookie หลัง rotate สำเร็จ",
+      "สร้าง access token 15 นาทีจาก user id ที่ยืนยันแล้ว",
+      "ตอบ 200 พร้อม access token ใน JSON แต่ไม่ส่ง refresh token ให้ JavaScript",
+      "เริ่ม catch เมื่อ service หรือการออก token ล้มเหลว",
+      "ส่ง error ต่อไป global handler",
+      "ปิด catch ของ refresh route",
+      "ปิด refresh handler",
+      "เว้นบรรทัดก่อน logout route",
+      "เปิด POST /logout พร้อมตรวจ Origin และ cookieParser",
+      "เริ่ม try block สำหรับการ revoke",
+      "revoke refresh record ก่อนตอบว่าออกจากระบบสำเร็จ",
+      "ล้าง cookie ด้วย options เดียวกันกับตอนออก token",
+      "ตอบ 200 ด้วย response shape มาตรฐานและ data null",
+      "เริ่ม catch เมื่อการ revoke ล้มเหลว",
+      "ส่ง error ต่อ global handler หาก database ล้มเหลว",
+      "ปิด catch",
+      "ปิด logout handler",
+      "เว้นบรรทัดก่อน export",
+      "ส่ง router ไปให้ app.js เมานต์ที่ /api/auth ตาม snippet ถัดไป",
     ],
-    'Concept นี้ยังต้องเพิ่ม CSRF token/Origin check และ revoke family เมื่อ reuse ถูกตรวจพบ',
+    'SameSite=Lax ไม่ส่ง cookie บน cross-site POST โดยทั่วไป แต่ไม่ใช่การ์ดรวม; ตัวอย่างนี้เพิ่ม Origin allowlist และยังควรพิจารณา CSRF token สำหรับระบบที่ต้องการ defense เพิ่ม',
   ),
   defineSnippet(
     'security-review-checklist',
@@ -306,5 +370,65 @@ export default router;`,
       'ยืนยันว่าสิ่งที่สอนใน browser Demo ใช้สำหรับการเรียนรู้ ไม่ใช่ production auth',
     ],
     'ทำ checklist นี้ก่อน production review และเก็บหลักฐานการตรวจแต่ละข้อ',
+  ),
+  defineSnippet(
+    'security-refresh-app',
+    'auth-backend/src/app.js',
+    'javascript',
+    `import 'dotenv/config';
+import express from 'express';
+import { configureSecurity } from './app.security.js';
+import authRoutes from './routes/authRoutes.js';
+import refreshRoutes from './routes/refreshRoutes.js';
+
+const app = express();
+configureSecurity(app);
+app.use(express.json({ limit: '16kb' }));
+
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'success', message: 'API พร้อมใช้งาน', data: { service: 'authlab' } });
+});
+app.use('/api/auth', authRoutes);
+app.use('/api/auth', refreshRoutes);
+
+app.use((req, res) => {
+  res.status(404).json({ status: 'error', message: 'ไม่พบ endpoint ที่ร้องขอ', data: null });
+});
+
+app.use((error, req, res, next) => {
+  console.error(error);
+  res.status(500).json({ status: 'error', message: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์', data: null });
+});
+
+export default app;`,
+    [
+      'โหลด environment ก่อนอ่านค่าความปลอดภัยและการเชื่อมต่อ',
+      'นำเข้า Express สำหรับสร้าง application instance',
+      'นำเข้า configureSecurity เพื่อติดตั้ง Helmet, CORS credentials และ rate limit',
+      'นำเข้า authRoutes สำหรับ Register, Login และ /me ที่สร้างไว้แล้ว',
+      'นำเข้า refreshRoutes สำหรับ rotation และ logout ในบทนี้',
+      'เว้นบรรทัดแยก dependency ออกจากการสร้าง app',
+      'สร้าง Express app ใหม่โดยไม่เปิด listener ในไฟล์นี้',
+      'เรียก configureSecurity ก่อน routes เพื่อให้ security middleware ครอบคลุมทุก request',
+      'อ่าน JSON body พร้อมจำกัดขนาด 16kb',
+      'เว้นบรรทัดก่อน health endpoint',
+      'สร้าง GET /api/health สำหรับตรวจ process',
+      'ตอบ JSON พื้นฐานโดยไม่เปิดเผย configuration',
+      'ปิด health callback',
+      'เมานต์ auth routes ใต้ /api/auth เช่นเวอร์ชันบท Backend',
+      'เมานต์ refresh routes ใต้ prefix เดียวกันเพื่อได้ /api/auth/refresh และ /logout',
+      'เว้นบรรทัดแยก routes ที่รู้จักออกจาก fallback',
+      'เพิ่ม fallback สำหรับ endpoint ที่ไม่พบ',
+      'ตอบ 404 ด้วย envelope เดียวกัน',
+      'ปิด fallback callback',
+      'เว้นบรรทัดก่อน error handler',
+      'ประกาศ Express error handler สี่อาร์กิวเมนต์',
+      'บันทึก error ฝั่ง server โดยไม่ log request body หรือ cookie',
+      'ตอบ 500 ทั่วไปและไม่ส่ง stack trace ให้ client',
+      'ปิด error handler',
+      'เว้นบรรทัดก่อนส่งออก app',
+      'ส่ง app instance ให้ server.js เปิด listener และจัดการ shutdown',
+    ],
+    'แทนที่ app.js เมื่อเปิดใช้ Security level; ตั้ง CLIENT_ORIGINS ให้มี origin จริงของ Frontend และ cookie-parser ติดตั้งแล้วจากบท Setup',
   ),
 ];

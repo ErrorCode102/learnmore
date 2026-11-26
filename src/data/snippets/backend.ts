@@ -24,6 +24,7 @@ export default pool;`,
     [
       'โหลด environment variables ก่อนสร้างการเชื่อมต่อฐานข้อมูล',
       'นำเข้า mysql2/promise เพื่อใช้ async/await กับ query ทั้งหมด',
+      'เว้นบรรทัดเพื่อแยกส่วนนำเข้า module ออกจากการสร้าง pool ให้อ่านง่าย',
       'สร้าง pool ที่แชร์ connection ระหว่าง request แทนการเปิดใหม่ทุกครั้ง',
       'อ่าน host ของ MySQL จาก env พร้อม localhost สำหรับเครื่องพัฒนา',
       'แปลง port เป็น number และใช้ 3306 หากไม่กำหนดค่า',
@@ -34,6 +35,8 @@ export default pool;`,
       'จำกัด pool ที่ 10 connections เพื่อไม่ทำให้ MySQL รับภาระเกินควบคุม',
       'ใช้ queueLimit 0 เพื่อไม่จำกัดจำนวนคิว ใน production ควรปรับตาม resource ที่มีจริง',
       'กำหนด charset utf8mb4 ให้ข้อมูลไทยและ emoji ถูกส่งผ่าน connection อย่างถูกต้อง',
+      'ปิด createPool พร้อมส่ง object การตั้งค่าให้ pool ถูกสร้าง',
+      'เว้นบรรทัดก่อน export เพื่อแยก configuration ออกจากส่วนส่งออก',
       'ส่ง pool instance ให้ model และ shutdown process ใช้งานร่วมกัน',
     ],
     'Pool จะถูกใช้จริงเมื่อเริ่ม register; ตรวจ connection ด้วยการเรียก /api/health และ query schema',
@@ -65,6 +68,7 @@ export const passwordPolicyMessage =
       'ต้องการตัวเลขอย่างน้อยหนึ่งตัวเพื่อให้รหัสผ่านไม่เป็นคำง่าย',
       'ต้องการอักขระพิเศษอย่างน้อยหนึ่งตัวนอกชุดอักษรและตัวเลข',
       'คืน true ก็ต่อเมื่อผ่านทุกกฎและไม่มี early return',
+      'ปิดฟังก์ชันหลังสรุปผลการตรวจทั้งหมด',
       'เว้นบรรทัดเพื่อแยก logic การตรวจจากข้อความที่ส่งให้ผู้ใช้',
       'ส่งออกข้อความภาษาไทยแบบเดียวกันสำหรับ validation error',
       'อธิบายเงื่อนไข 8–72 ตัวและการมีสี่กลุ่มอักขระให้ผู้ใช้แก้ไขได้',
@@ -102,21 +106,30 @@ export async function createUser(email, passwordHash) {
 }`,
     [
       'นำเข้า pool จากโมดูล database เพื่อให้ model เป็นผู้มีหน้าที่เรียก SQL ของผู้ใช้',
+      'เว้นบรรทัดก่อนฟังก์ชันเพื่อแยก dependency ออกจากนิยามฟังก์ชัน',
       'ประกาศฟังก์ชันค้นหาผู้ใช้จาก email สำหรับขั้นตอน Register และ Login',
-      'ส่ง SELECT แบบ parameterized เพื่อไม่แถม input ลงใน SQL string',
+      'เปิด pool.execute ที่คืน promise และ destructure ชุดแถวจากผลลัพธ์',
+      'ส่ง SELECT แบบ parameterized เพื่อไม่แถบ input ลงใน SQL string',
       'ส่ง email เป็นค่า parameter ที่ mysql2 escape และ quote ให้อย่างปลอดภัย',
+      'ปิด pool.execute พร้อมส่ง argument ทั้ง query และค่า parameter',
       'คืนผู้ใช้แรกหรือ null เมื่อไม่พบแถวที่ตรงกัน',
+      'ปิดฟังก์ชันค้นหาด้วย email ให้ caller ใช้ต่อได้',
       'เว้นบรรทัดเพื่อแยกการค้นหาด้วย email ออกจากการค้นหาด้วย id',
       'ประกาศฟังก์ชันอ่านข้อมูลผู้ใช้สำหรับ protected /me endpoint',
+      'เปิด query อ่านผู้ใช้ด้วย id พร้อมรอผลลัพธ์แบบ asynchronous',
       'เลือกเฉพาะคอลัมน์ที่ปลอดภัย ไม่รวม password_hash ออกจาก response',
       'ส่ง id ที่ได้จาก verified JWT เป็น parameter ของ query',
+      'ปิด pool.execute สำหรับ query อ่านผู้ใช้ด้วย id',
       'คืนข้อมูลผู้ใช้หรือ null หาก token ยังอยู่แต่ผู้ใช้ถูกลบ',
+      'ปิดฟังก์ชัน findById เพื่อแยกการทำงานจากฟังก์ชันถัดไป',
       'เว้นบรรทัดเพื่อแยก query อ่านออกจากการสร้างผู้ใช้',
-      'ประกาศฟังก์ชันINSERT ผู้ใช้โดยรับ hash ที่ controller สร้างแล้ว',
+      'ประกาศฟังก์ชัน insert ผู้ใช้โดยรับ hash ที่ controller สร้างแล้ว',
+      'เปิด INSERT แบบ parameterized พร้อมรอผลลัพธ์จาก MySQL',
       'กำหนดสองคอลัมน์ email และ password_hash พร้อม placeholder สองตัว',
       'ส่งค่า email กับ hash แยกจาก SQL เพื่อป้องกัน SQL injection',
+      'ปิด pool.execute สำหรับ INSERT แล้วเก็บ result ไว้อ่าน insertId',
       'อ่าน insertId ที่ MySQL สร้างจาก AUTO_INCREMENT',
-      'คืน id ของผู้ใช้ใหม่เพื่อ controller ใส่ไว้ใน JWT และ response',
+      'คืน id ของผู้ใช้ใหม่เพื่อ controller ใส่ไว้ใน JWT และ response และปิดฟังก์ชัน',
     ],
     'Model ไม่รับ plaintext password และไม่ส่ง hash กลับไปที่ Frontend',
   ),
@@ -159,14 +172,20 @@ export const loginValidation = [
       'กำหนดข้อความ error ภาษาไทยเมื่อรูปแบบอีเมลไม่ถูกต้อง',
       'จำกัด email ไม่เกิน 255 ตัวให้ตรงกับ VARCHAR ในตาราง users',
       'กำหนดข้อความ error เมื่ออีเมลยาวเกิน schema',
+      'เริ่มตรวจ password โดยเชื่อมต่อ custom policy ที่มีชื่อชัดเจน',
       'ตรวจ password ด้วย pure function เพื่อให้กฎตรงกับ unit test',
       'ส่งข้อความ policy ที่อธิบายวิธีแก้รหัสผ่านได้ชัดเจน',
+      'ปิด array ของ validation Register เพื่อ Express เรียกตามลำดับ',
       'เว้นบรรทัดเพื่อแยก validation ของ Register ออกจาก Login',
       'ส่งออก middleware array สำหรับ endpoint Login',
       'ตรวจ email ของ Login แบบ trimmed เช่นเดียวกับ Register',
+      'เริ่ม chain ตรวจรูปแบบ email สำหรับ Login',
       'ใช้ข้อความ error เมื่อ Login ไม่มีอีเมลรูปแบบถูกต้อง',
+      'เริ่ม chain ตรวจ password สำหรับ Login',
       'ตรวจเพียงว่ารหัสผ่านไม่ว่าง ไม่ใช้ policy ใหม่เพราะต้องรับรหัสเก่าที่เคยสมัคร',
       'บอกผู้ใช้ให้กรอกรหัสผ่านโดยไม่เปิดเผยว่าบัญชีหรือรหัสผิด',
+      'ปิด chain ของ password เพื่อจบ validator ตัวนี้ก่อนปิด array',
+      'ปิด array ของ validation Login เพื่อส่งให้ route ใช้งาน',
     ],
     'Validation อยู่บน server เสมอ; การตรวจใน browser เป็นเพียงความสะดวก',
   ),
@@ -176,7 +195,7 @@ export const loginValidation = [
     'javascript',
     `import jwt from 'jsonwebtoken';
 
-function getJwtSecret() {
+export function getJwtSecret() {
   const secret = process.env.JWT_SECRET;
   if (!secret || secret.length < 32) {
     throw new Error('JWT_SECRET ต้องมีความยาวอย่างน้อย 32 ตัวอักษร');
@@ -193,16 +212,22 @@ export function signAccessToken(user) {
 }`,
     [
       'นำเข้า jsonwebtoken สำหรับสร้าง signed JWT ด้วย secret จาก environment',
-      'ประกาศฟังก์ชันอ่าน secret และตรวจ configuration ก่อน sign token',
+      'เว้นบรรทัดเพื่อแยก dependency ออกจาก helper อ่าน configuration',
+      'ประกาศและส่งออกฟังก์ชันอ่าน secret เพื่อให้ middleware ใช้ตรวจ configuration ก่อน verify token',
       'อ่าน JWT_SECRET จาก process.env ไม่ใช้ fallback ที่คาดเดาได้',
       'ปฏิเสธ secret ที่ว่างหรือสั้นกว่า 32 ตัวเพื่อลดการ guess',
       'โยน error ให้ server ไม่เริ่มออก token ด้วย configuration ที่อ่อนเกินไป',
+      'ปิด if หลังจัดการ configuration ที่ไม่ปลอดภัยแล้วเตรียมคืนค่า',
       'คืน secret ที่ผ่านการตรวจเพื่อส่งให้ jwt.sign',
+      'ปิดฟังก์ชันอ่าน secret เพื่อไม่ให้ caller กำหนดขั้นตอนสร้าง token ซ้ำ',
       'เว้นบรรทัดเพื่อแยก configuration ออกจากการสร้าง token',
       'ส่งออกฟังก์ชัน sign ที่รับข้อมูลผู้ใช้ minimal',
+      'เปิด jwt.sign พร้อม payload, secret และ options ที่ควบคุมความปลอดภัย',
       'ใส่ user id ใน claim sub และแปลงเป็น string ตาม JWT subject standard',
       'อ่าน secret ที่ตรวจแล้วผ่าน getJwtSecret แทนการอ่าน env ตรง ๆ',
       'กำหนดอายุ 15m, algorithm HS256, issuer และ audience เพื่อให้ verify ตรวจกลับได้',
+      'ปิด jwt.sign เพื่อสร้าง token string จากพารามิเตอร์ด้านบน',
+      'คืน access token ที่ลงนามแล้วให้ controller ตอบกลับและปิดฟังก์ชัน',
     ],
     'ค่าวันหมดอายุต้องตั้งผ่าน .env; ห้าม commit secret จริงหรือ log token',
   ),
@@ -241,15 +266,22 @@ export function requireAuth(req, res, next) {
       'อ่าน Authorization header และใช้ string ว่างเมื่อ client ไม่ส่งมา',
       'แยก scheme กับ token ด้วยช่องว่างตามรูปแบบ Bearer <token>',
       'เว้นบรรทัดเพื่อแยกการอ่าน header ออกจากการตรวจรูปแบบ',
+      'เริ่มเงื่อนไขตรวจ scheme และการมีอยู่ของ token',
       'ปฏิเสธ header ที่ไม่ใช่ Bearer หรือไม่มี token ด้วยสถานะ 401',
       'ตอบ JSON shape เดียวกันโดยไม่บอกว่า token หมดอายุหรือลายเซ็นผิด',
+      'ปิด if หลังคืน response เพื่อไม่รัน verification ต่อ',
       'เว้นบรรทัดเพื่อแยก input validation ออกจาก cryptographic verification',
-      'ตรวจ token ด้วย secret, algorithm whitelist, issuer และ audience',
+      'เปิด jwt.verify พร้อม secret และ options ที่จำกัดการยืนยัน',
+      'อนุญาตเฉพาะ algorithm HS256 เพื่อไม่ยอมรับวิธีอื่นที่ไม่ได้กำหนด',
+      'กำหนด issuer authlab ให้ตรงกับ token ที่ออกจากระบบนี้',
+      'กำหนด audience authlab-client เพื่อแยก token สำหรับ client นี้',
+      'ปิด options ของ jwt.verify',
       'อ่าน subject จาก verified payload และแปลงเป็น id ตัวเลข',
       'แนบ user id เข้า req เพื่อ controller ใช้โดยไม่เชื่อม userId จาก body',
       'อนุญาตให้ request ผ่านไปยัง route ถัดไปเมื่อ verify สำเร็จ',
       'จับ error ทั้งหมดสำหรับ token ที่ผิด หมดอายุหรือ config ไม่ถูกต้อง',
       'ตอบ 401 ด้วยข้อความทั่วไปเพื่อไม่เปิดเผยรายละเอียดการยืนยัน',
+      'ปิด catch เพื่อสิ้นสุด middleware และปิดฟังก์ชัน',
     ],
     'JWT ไม่ได้ encrypt ข้อมูล; ห้ามเก็บ password หรือ secret ใน payload',
   ),
@@ -260,7 +292,6 @@ export function requireAuth(req, res, next) {
     `import bcrypt from 'bcryptjs';
 import { validationResult } from 'express-validator';
 import { createUser, findByEmail, findById } from '../models/userModel.js';
-import { passwordPolicyMessage } from '../utils/passwordPolicy.js';
 import { signAccessToken } from '../utils/token.js';
 
 function publicUser(user) {
@@ -333,11 +364,11 @@ export async function me(req, res, next) {
       'นำเข้า bcryptjs สำหรับ hash และ compare password แบบ asynchronous',
       'นำเข้า validationResult เพื่ออ่านผลตรวจสอบ input ที่ middleware บันทึกไว้',
       'นำเข้า model สามฟังก์ชันสำหรับค้นหาและสร้างผู้ใช้',
-      'นำเข้าข้อความ policy สำหรับกรณี exception จาก bcrypt ที่เกี่ยวข้องกับความยาว',
       'นำเข้า signAccessToken เพื่อออก token หลังยืนยันตัวตนสำเร็จ',
       'เว้นบรรทัดเพื่อแยก dependency ออกจาก helper ของ controller',
       'ประกาศ helper ที่เลือกเฉพาะ field ที่ปลอดภัยจะแสดงให้ client',
       'คืน id, email และเวลาสร้าง โดยไม่รวม password_hash',
+      'ปิด helper publicUser ที่จำกัดข้อมูลผู้ใช้ใน response',
       'เว้นบรรทัดเพื่อแยก helper ออกจาก Register handler',
       'ส่งออก asynchronous controller สำหรับ POST /api/auth/register',
       'รวบรวม validation errors จาก request นี้โดยไม่ panic เมื่อข้อมูลผิด',
@@ -345,42 +376,62 @@ export async function me(req, res, next) {
       'ตอบ 422 เมื่อ input ผ่านรูปแบบ HTTP แต่ไม่ผ่าน business validation',
       'กำหนด status error และ message ภาษาไทยที่ Frontend แสดงได้',
       'ส่ง errors แบบ field/message เพื่อให้ฟอร์ม map error กับ input ได้',
+      'ปิด object data ที่บรรจุ validation errors สำหรับ client',
+      'ปิด response object ของ 422',
+      'ปิด if เมื่อ validation ไม่ผ่านแล้วไม่ดำเนินการต่อ',
       'เว้นบรรทัดเพื่อแยก validation response ออกจากกระบวนการสมัคร',
-      'normalize email เป็น lowercase เพื่อลดปัญหา duplicate จากตัวพิมพ์ใหญ่',
+      'normalize email เป็น lowercase และ trim เพื่อลดปัญหา duplicate จากช่องว่างหรือตัวพิมพ์',
       'hash password ด้วย cost 12 ก่อนส่งเข้า database และไม่เก็บ plaintext',
-      'เว้นบรรทัดเพื่อแยกการเตรียม credential อจากการเขียนข้อมูล',
+      'เว้นบรรทัดเพื่อแยกการเตรียม credential ออกจากการเขียนข้อมูล',
       'เริ่ม try block สำหรับ database และ token errors ที่ต้องจัดการต่อ',
       'ค้นหาอีเมลก่อนเพื่อให้ผู้ใช้ได้รับ feedback ที่ช่วยได้',
+      'ตรวจผลค้นหาเพื่อแยกกรณีอีเมลที่ใช้แล้ว',
       'ตอบ 409 เมื่ออีเมลมีอยู่แล้วโดยไม่สร้างผู้ใช้ซ้ำ',
+      'ปิด if ของอีเมลที่ซ้ำเพื่อไปขั้นตอนถัดไปเมื่อไม่มีผู้ใช้',
       'สร้างผู้ใช้จาก email และ hash ที่ผ่าน validation แล้ว',
       'ออก access token ด้วย id จาก INSERT ไม่ใช่อีเมลที่ client ส่งเข้ามา',
       'ตอบ 201 Created เพราะมี resource ผู้ใช้ใหม่ถูกสร้าง',
+      'กำหนด status success และข้อความยืนยันการสมัคร',
+      'กำหนดข้อความยืนยันการสมัครสมาชิกภาษาไทย',
       'ส่ง token และ public user ใน data เพื่อ Frontend เริ่ม session ได้ทันที',
-      'จับ database error และ configuration error ที่ไม่ควร reveal ต่อ client',
-      'แปลง ER_DUP_ENTRY จาก unique constraint เป็น 409 สำหรับ race condition',
+      'ปิด object ของ response สำเร็จ',
+      'เริ่ม catch เพื่อจับ error ที่ไม่ใช่ duplicate และจัดการต่อ',
+      'แยกกรณี ER_DUP_ENTRY ที่เกิดจาก unique constraint ระหว่าง race',
       'ตอบ 409 แบบเดียวกันเมื่อ request พร้อมกันแล้ว unique constraint ป้องกัน race condition',
+      'ปิด if ของ duplicate error',
       'ส่ง error อื่นไป global handler เพื่อตอบ 500 และ log ฝั่ง server',
+      'ปิด try/catch ของ Register',
       'ปิด Register handler',
       'เว้นบรรทัดเพื่อแยก Register และ Login handlers',
       'ส่งออก asynchronous controller สำหรับ POST /api/auth/login',
-      'ตรวจ validation ของ Login เช่นเดียวกับ Register ก่อน query',
-      'ตอบ 422 แบบสั้นเมื่อ field หายหรือ format ผิดโดยไม่เปิดเผยรายละเอียดภายใน',
+      'รวบรวม validation errors ของ Login ก่อนค้นหาผู้ใช้',
+      'ตรวจว่าฟอร์ม Login มี field หรือ format ที่ผิดหรือไม่',
+      'ตอบ 422 แบบสั้นเมื่อ input ไม่ถูกต้องโดยไม่เปิดเผยรายละเอียดภายใน',
+      'ปิด if เมื่อ Login ไม่ผ่าน validation',
+      'เว้นบรรทัดเพื่อแยก validation ออกจากการค้นหาผู้ใช้',
       'อ่าน email แล้ว normalize เหมือน Register เพื่อค้นพบผู้ใช้เดียวกัน',
       'ค้นหาผู้ใช้ด้วย parameterized query จาก model',
-      'เปรียบเทียบ password กับ bcrypt hash เฉพาะเมื่อพบผู้ใช้',
-      'ใช้ boolean false เมื่อไม่พบผู้ใช้เพื่อไม่เรียก compare กับ hash ที่ไม่มีจริง',
-      'เว้นบรรทัดเพื่อแยกการยืนยัน credential อจากการตัดสินใจ response',
+      'เปรียบเทียบ password กับ bcrypt hash เฉพาะเมื่อพบผู้ใช้และ false เมื่อไม่พบ',
+      'เว้นบรรทัดเพื่อแยกการยืนยัน credential ออกจากการตัดสินใจ response',
       'รวมเงื่อนไข user ไม่พบหรือ password ผิดไว้ในทางออกเดียวกัน',
       'ตอบ 401 Unauthorized ด้วย generic error เพื่อลด user enumeration',
+      'ปิด if ของ credential ที่ไม่ถูกต้อง',
+      'เว้นบรรทัดก่อนออก token เพื่อแยกเส้นทาง login ที่ล้มเหลวออกจากเส้นทางสำเร็จ',
       'sign token ใหม่หลัง password ถูกยืนยันสำเร็จ',
       'ตอบ 200 OK สำหรับ Login ที่ไม่สร้าง resource ใหม่',
-      'ส่ง token และ public user ใน response shape เดียวกับ Register',
+      'กำหนด status success และข้อความเข้าสู่ระบบภาษาไทย',
+      'ส่งข้อความเข้าสู่ระบบสำเร็จให้ Frontend แสดงโดยไม่มีข้อมูลลับ',
+      'ส่ง token และ public user ใน data เพื่อ Frontend เก็บ session',
+      'ปิด object ของ response Login สำเร็จ',
       'ปิด Login handler',
       'เว้นบรรทัดเพื่อแยก Login ออกจาก protected endpoint',
       'ส่งออก controller สำหรับ GET /api/auth/me ที่ requireAuth ป้องกันไว้',
       'อ่านผู้ใช้จาก id ที่ JWT middleware ตรวจแล้ว ไม่รับ id จาก query string',
+      'ตรวจว่าผู้ใช้ยังมีอยู่ใน database หรือถูกถูกลบไปแล้ว',
       'ตอบ 401 เมื่อ token ถูกต้องแต่ผู้ใช้ไม่มีใน database แล้ว',
+      'ปิด if ของผู้ใช้ที่ถูกลบ',
       'ตอบ 200 พร้อม public user เท่านั้นเมื่อพบข้อมูล',
+      'ปิด response object และปิดฟังก์ชัน me',
     ],
     'Controller ไม่ส่ง password_hash, stack trace หรือ token ใน log',
   ),
@@ -401,6 +452,7 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const router = Router();
 router.post('/register', authLimiter, registerValidation, register);
 router.post('/login', authLimiter, loginValidation, login);
 router.get('/me', requireAuth, me);
@@ -418,12 +470,93 @@ export default router;`,
       'กำหนดเพดาน 20 requests ต่อ IP ต่อหน้าต่างเป็นจุดเริ่มสำหรับฝึก',
       'เปิด standard headers เพื่อให้ client รู้สถานะ rate limit',
       'ปิด legacy headers เพื่อลด header ที่ไม่จำเป็น',
+      'ปิด rateLimit พร้อมส่ง options ทั้งหมดให้ limiter ถูกสร้าง',
       'เว้นบรรทัดเพื่อแยก limiter ออกจาก route declarations',
+      'สร้าง router instance สำหรับเก็บเส้นทาง authentication ทั้งหมด',
       'ผูก POST /register กับ limiter, validation และ controller ตามลำดับ',
       'ผูก POST /login กับ limiter, validation และ controller เช่นกัน',
       'ผูก GET /me กับ requireAuth ก่อน controller เพื่อบังคับ Bearer token',
       'ส่ง router ไปให้ app.js เมานต์ภายใต้ /api/auth',
+      'เว้นบรรทัดก่อนส่งออก router เพื่อแยก declarations ออกจาก export',
     ],
     'เส้นทางเต็มคือ /api/auth/register, /api/auth/login และ /api/auth/me',
+  ),
+  defineSnippet(
+    'backend-auth-app',
+    'auth-backend/src/app.js',
+    'javascript',
+    `import 'dotenv/config';
+import express from 'express';
+import helmet from 'helmet';
+import cors from 'cors';
+import { rateLimit } from 'express-rate-limit';
+import authRoutes from './routes/authRoutes.js';
+
+const app = express();
+const allowedOrigin = process.env.CLIENT_ORIGIN ?? 'http://localhost:5173';
+
+app.use(helmet());
+app.use(cors({ origin: allowedOrigin }));
+app.use(express.json({ limit: '16kb' }));
+app.use('/api', rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 100,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+}));
+
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'success', message: 'API พร้อมใช้งาน', data: { service: 'authlab' } });
+});
+app.use('/api/auth', authRoutes);
+
+app.use((req, res) => {
+  res.status(404).json({ status: 'error', message: 'ไม่พบ endpoint ที่ร้องขอ', data: null });
+});
+
+app.use((error, req, res, next) => {
+  console.error(error);
+  res.status(500).json({ status: 'error', message: 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์', data: null });
+});
+
+export default app;`,
+    [
+      'โหลด .env ก่อนสร้างแอปและอ่านค่า environment',
+      'นำเข้า Express สำหรับสร้าง application instance',
+      'นำเข้า helmet เพื่อเพิ่ม security headers',
+      'นำเข้า cors เพื่อจำกัด origin ที่อ่าน response ข้าม port ได้',
+      'นำเข้า rateLimit เพื่อจำกัด request รวมของ API',
+      'นำเข้า authRoutes ที่สร้างจาก middleware และ controller ในบทนี้',
+      'เว้นบรรทัดแยก dependency ออกจากการสร้าง app',
+      'สร้าง Express app โดยยังไม่เปิด network listener',
+      'อ่าน origin ที่อนุญาตจาก env พร้อมค่า dev localhost:5173',
+      'เว้นบรรทัดแยก configuration ออกจาก middleware',
+      'ติดตั้ง helmet ให้ response ทุกเส้นทาง',
+      'เปิด CORS เฉพาะ origin ที่กำหนด',
+      'อ่าน JSON body โดยจำกัดขนาด 16kb',
+      'ติดตั้ง global rate limiter ที่ path /api',
+      'ตั้งหน้าต่างนับ request 15 นาที',
+      'จำกัดแต่ละ IP ที่ 100 requests ต่อหน้าต่าง',
+      'เปิด standard rate limit headers',
+      'ปิด legacy headers เพื่อไม่ส่งข้อมูลซ้ำ',
+      'ปิด global rate limiter',
+      'เว้นบรรทัดก่อน health endpoint',
+      'สร้าง GET /api/health ที่ไม่ต้อง authentication',
+      'ตอบ JSON ว่า process พร้อมใช้งานโดยไม่ query database',
+      'ปิด health callback',
+      'เมานต์ authRoutes ใต้ /api/auth เพื่อเปิด Register, Login และ /me',
+      'เว้นบรรทัดแยก routes ที่รู้จักออกจาก fallback',
+      'เพิ่ม fallback สำหรับ request ที่ไม่ตรง endpoint ใด',
+      'ตอบ 404 ด้วย response envelope เดียวกัน',
+      'ปิด fallback callback',
+      'เว้นบรรทัดก่อน error handler',
+      'ประกาศ Express error handler สี่อาร์กิวเมนต์',
+      'บันทึก error ฝั่ง server เพื่อช่วย debug',
+      'ตอบ 500 ทั่วไปโดยไม่ส่ง stack trace ให้ client',
+      'ปิด error handler',
+      'เว้นบรรทัดก่อนส่งออก app',
+      'ส่ง app instance ให้ server.js เปิด listener',
+    ],
+    'แทนที่ app.js จากบท Setup ด้วยไฟล์นี้หลังจากสร้าง authRoutes.js แล้วรีสตาร์ต npm run dev',
   ),
 ];

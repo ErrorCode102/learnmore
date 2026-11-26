@@ -58,6 +58,8 @@ describe('CodeExplorer', () => {
   it('updates the polite live detail panel through buttons and previous/next controls', () => {
     renderExplorer();
     const detail = screen.getByRole('complementary', { name: 'รายละเอียดบรรทัด' });
+    expect(detail).toHaveClass('bg-surface', 'text-ink', 'border-line');
+    expect(detail).not.toHaveClass('bg-white');
     expect(detail.querySelector('[aria-live="polite"]')).not.toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'บรรทัด 3' }));
     expect(within(detail).getByRole('heading', { name: 'บรรทัด 3' })).toBeVisible();
@@ -142,5 +144,12 @@ describe('Callout', () => {
     expect(screen.getByText(label)).toBeVisible();
     expect(screen.getByRole('heading', { name: 'หัวข้อสำคัญ' })).toBeVisible();
     expect(screen.getByText('รายละเอียดที่ผู้เรียนต้องอ่าน')).toBeVisible();
+    if (tone === 'success') {
+      expect(screen.getByText(label).closest('aside')).toHaveClass(
+        'border-success-border',
+        'bg-soft-success',
+        'text-success',
+      );
+    }
   });
 });

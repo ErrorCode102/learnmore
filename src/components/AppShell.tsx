@@ -8,6 +8,7 @@ import {
 import { useEffect, type MouseEvent } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { getContinueSelection } from './ContinueCard';
+import { ThemeToggle } from './ThemeToggle';
 import { useClassroomProgress } from '../context/ProgressContext';
 import { getLessonsForLevel } from '../data/course';
 import type { Level } from '../types/course';
@@ -83,21 +84,25 @@ export function AppShell() {
               <BookOpen aria-hidden="true" className="h-5 w-5" strokeWidth={1.8} />
             </span>
             <span className="text-xl font-bold tracking-[-0.03em]">AuthLab</span>
-            <span className="hidden rounded-full border border-line px-2.5 py-1 text-[10px] font-semibold tracking-[0.16em] text-muted sm:inline">
+            <span className="hidden rounded-full border border-line px-2.5 py-1 text-[10px] font-semibold tracking-[0.16em] text-muted sm:inline lg:hidden">
               CLASSROOM
             </span>
           </Link>
 
-          {continueSelection && (
-            <button
-              type="button"
-              onClick={() => navigate(`/lesson/${continueSelection.lesson.id}`)}
-              className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl bg-brand px-3.5 text-xs font-semibold text-white transition-colors hover:bg-brand-deep lg:hidden"
-            >
-              เริ่มเรียน
-              <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
-            </button>
-          )}
+          <div className="flex shrink-0 items-center gap-2">
+            <ThemeToggle />
+            {continueSelection && (
+              <button
+                type="button"
+                onClick={() => navigate(`/lesson/${continueSelection.lesson.id}`)}
+                aria-label="เริ่มเรียน"
+                className="inline-flex min-h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-brand-solid px-3.5 text-xs font-semibold text-on-inverse transition-colors hover:bg-brand-solid-hover sm:w-auto lg:hidden"
+              >
+                <span className="hidden sm:inline">เริ่มเรียน</span>
+                <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
         <nav

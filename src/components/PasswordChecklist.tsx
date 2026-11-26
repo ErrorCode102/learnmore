@@ -20,7 +20,7 @@ export function PasswordChecklist({ password }: PasswordChecklistProps) {
             {check.passed ? (
               <Check aria-hidden="true" className="h-4 w-4 shrink-0 text-brand" />
             ) : (
-              <X aria-hidden="true" className="h-4 w-4 shrink-0 text-coral" />
+              <X aria-hidden="true" className="h-4 w-4 shrink-0 text-danger" />
             )}
             <span>{check.label}</span>
             <span className="sr-only">{check.passed ? 'ผ่านแล้ว' : 'ยังไม่ผ่าน'}</span>

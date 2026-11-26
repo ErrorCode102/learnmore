@@ -14,7 +14,7 @@ export function LessonCard({ lesson, completed }: LessonCardProps) {
         aria-hidden="true"
         className={`absolute left-0 top-6 z-10 flex h-10 w-10 items-center justify-center rounded-full border-4 border-canvas font-mono text-xs font-semibold shadow-sm sm:h-11 sm:w-11 ${
           completed
-            ? 'bg-brand text-white'
+            ? 'bg-brand-solid text-on-inverse'
             : 'bg-surface text-brand'
         }`}
       >

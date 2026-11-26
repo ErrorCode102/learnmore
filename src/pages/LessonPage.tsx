@@ -371,7 +371,7 @@ export function LessonPage() {
               className={`mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition-colors sm:w-auto ${
                 completed
                   ? 'border border-line bg-surface text-ink hover:bg-canvas'
-                  : 'bg-brand text-white hover:bg-brand-deep'
+                  : 'bg-brand-solid text-on-inverse hover:bg-brand-solid-hover'
               }`}
             >
               {completed ? (
@@ -408,7 +408,7 @@ export function LessonPage() {
             {nextLesson ? (
               <Link
                 to={`/lesson/${nextLesson.id}`}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-ink px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-deep"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-inverse px-5 py-3 text-sm font-semibold text-on-inverse transition-colors hover:bg-brand-solid-hover"
               >
                 บทถัดไป: {nextLesson.shortTitle}
                 <ArrowRight aria-hidden="true" className="h-4 w-4" />
@@ -416,7 +416,7 @@ export function LessonPage() {
             ) : (
               <Link
                 to="/practice"
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-ink px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-deep"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-inverse px-5 py-3 text-sm font-semibold text-on-inverse transition-colors hover:bg-brand-solid-hover"
               >
                 ไปยังฝึกท้ายบท
                 <ArrowRight aria-hidden="true" className="h-4 w-4" />

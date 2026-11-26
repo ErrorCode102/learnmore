@@ -74,7 +74,14 @@ describe('LessonPage', () => {
     const outline = screen.getByRole('navigation', { name: 'ลำดับบทเรียน' });
     expect(within(outline).getAllByRole('listitem')).toHaveLength(8);
     expect(
-      within(outline).getByRole('link', { name: /1\. ภาพรวม/ }),
+      within(screen.getByRole('navigation', { name: 'การนำทางระหว่างบทเรียน' })).getByRole('link', {
+        name: /^บทถัดไป:/,
+      }),
+    ).toHaveClass('bg-inverse', 'text-on-inverse');
+    expect(
+      within(screen.getByRole('navigation', { name: 'ลำดับบทเรียน' })).getByRole('link', {
+        name: /1\. ภาพรวม/,
+      }),
     ).toHaveAttribute('aria-current', 'page');
 
     await waitFor(() => {
@@ -202,6 +209,7 @@ describe('LessonPage', () => {
 
     const toggle = screen.getByRole('button', { name: 'ทำเครื่องหมายว่าครบแล้ว' });
     expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    expect(toggle).toHaveClass('bg-brand-solid', 'text-on-inverse');
     fireEvent.click(toggle);
 
     const cancel = screen.getByRole('button', { name: 'ยกเลิกเครื่องหมายความคืบหน้า' });

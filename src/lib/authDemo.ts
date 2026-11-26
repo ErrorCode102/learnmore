@@ -1,5 +1,6 @@
 export const DEMO_USERS_KEY = 'auth-classroom:demo-users:v1';
 export const DEMO_SESSION_KEY = 'auth-classroom:demo-session:v1';
+export const DEMO_REGISTRATION_LOCK = 'auth-classroom:demo-register';
 
 const PBKDF2_ITERATIONS = 120_000;
 
@@ -175,15 +176,19 @@ export async function registerUser(input: RegisterInput): Promise<DemoSession> {
   if (!isPasswordStrongEnough(input.password)) {
     throw new Error(passwordPolicyMessage);
   }
+  if (typeof navigator === 'undefined' || !navigator.locks) {
+    throw new Error(
+      'เบราว์เซอร์นี้ไม่รองรับ Web Locks สำหรับ Demo กรุณาใช้ HTTPS หรือ localhost',
+    );
+  }
 
-  const salt = createRandomHex(16);
-  const passwordHash = await hashPassword(input.password, salt);
-  const users = readUsers();
-
-  if (users.some((user) => user.email === email)) {
+  const existingUsers = readUsers();
+  if (existingUsers.some((user) => user.email === email)) {
     throw new Error('อีเมลนี้ถูกใช้งานแล้ว');
   }
 
+  const salt = createRandomHex(16);
+  const passwordHash = await hashPassword(input.password, salt);
   const user: DemoUser = {
     id: createRandomHex(16),
     name,
@@ -192,7 +197,15 @@ export async function registerUser(input: RegisterInput): Promise<DemoSession> {
     passwordHash,
     createdAt: new Date().toISOString(),
   };
-  writeUsers([...users, user]);
+
+  await navigator.locks.request(DEMO_REGISTRATION_LOCK, () => {
+    const users = readUsers();
+    if (users.some((candidate) => candidate.email === email)) {
+      throw new Error('อีเมลนี้ถูกใช้งานแล้ว');
+    }
+    writeUsers([...users, user]);
+  });
+
   const session = toSession(user);
   writeSession(session);
   return session;
@@ -253,7 +266,7 @@ export function logout(): void {
   try {
     window.sessionStorage.removeItem(DEMO_SESSION_KEY);
   } catch {
-    // A session that cannot be removed remains unreachable when storage is unavailable.
+    throw new Error('ไม่สามารถออกจากระบบในเบราว์เซอร์นี้ได้');
   }
 }
 
@@ -262,10 +275,19 @@ export function resetDemoData(): void {
     return;
   }
 
+  let failed = false;
   try {
     window.localStorage.removeItem(DEMO_USERS_KEY);
+  } catch {
+    failed = true;
+  }
+  try {
     window.sessionStorage.removeItem(DEMO_SESSION_KEY);
   } catch {
-    // Storage may be blocked; the current in-memory Demo session is still cleared by the page.
+    failed = true;
+  }
+
+  if (failed) {
+    throw new Error('ไม่สามารถล้างข้อมูล Demo ในเบราว์เซอร์นี้ได้');
   }
 }

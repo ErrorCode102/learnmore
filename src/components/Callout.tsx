@@ -4,7 +4,7 @@ import type { LessonCallout } from '../types/course';
 const toneStyles = {
   info: { label: 'ข้อมูล', className: 'border-brand/20 bg-soft-brand text-brand', Icon: Info },
   warning: { label: 'คำเตือน', className: 'border-coral/25 bg-soft-coral text-coral', Icon: TriangleAlert },
-  success: { label: 'สำเร็จ', className: 'border-emerald-200 bg-emerald-50 text-emerald-800', Icon: CircleCheckBig },
+  success: { label: 'สำเร็จ', className: 'border-success-border bg-soft-success text-success', Icon: CircleCheckBig },
 } as const;
 
 export function Callout({ tone, title, text }: LessonCallout) {

@@ -78,6 +78,19 @@ describe('AppShell navigation', () => {
     );
   });
 
+  it('exposes the theme control and reserves desktop header space', () => {
+    renderAt('/');
+
+    expect(
+      screen.getByRole('button', { name: /ธีมปัจจุบันเป็นตามระบบ/ }),
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: 'เริ่มเรียน' })).toHaveClass(
+      'bg-brand-solid',
+      'text-on-inverse',
+    );
+    expect(screen.getByText('CLASSROOM')).toHaveClass('lg:hidden');
+  });
+
   it('clips horizontal decoration without making the sticky shell a scroll container', () => {
     const { container } = renderAt('/');
     const wrapper = container.firstElementChild;

@@ -41,24 +41,26 @@ function contrastRatio(foreground: string, background: string) {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-function themeColor(name: 'ink' | 'coral') {
-  const css = sourceStyles;
-  const value = css.match(new RegExp(`--${name}:\\s*(#[\\da-fA-F]{6})`))?.[1];
+type Theme = 'light' | 'dark';
+type ThemeColor =
+  | 'ink'
+  | 'coral'
+  | 'accent'
+  | 'accent-hover'
+  | 'on-accent'
+  | 'inverse'
+  | 'on-inverse';
+
+function themeColor(name: ThemeColor, theme: Theme = 'light') {
+  const selector = theme === 'dark'
+    ? /:root\[data-theme=["']dark["']\]\s*\{([^}]*)\}/
+    : /:root\s*\{([^}]*)\}/;
+  const block = sourceStyles.match(selector)?.[1];
+  const value = block?.match(new RegExp(`--${name}:\\s*(#[\\da-fA-F]{6})`))?.[1];
   if (!value) {
-    throw new Error(`Theme color --${name} was not found.`);
+    throw new Error(`Theme color --${name} was not found in the ${theme} theme.`);
   }
   return value;
-}
-
-function hoverBackground(cta: HTMLElement) {
-  const hoverClass = Array.from(cta.classList).find((className) =>
-    className.startsWith('hover:bg-[#'),
-  );
-  const color = hoverClass?.match(/#[\da-fA-F]{6}/)?.[0];
-  if (!color) {
-    throw new Error('Expected the CTA to declare a six-digit hex hover background.');
-  }
-  return color;
 }
 
 function ContinueLink() {
@@ -76,24 +78,36 @@ beforeEach(() => {
 });
 
 describe('ContinueCard CTA contrast', () => {
-  it('uses dark ink on the coral background in normal and hover treatments', () => {
-    expect(themeColor('coral')).toBe('#f97362');
-    expect(contrastRatio(themeColor('ink'), themeColor('coral'))).toBeGreaterThanOrEqual(4.5);
-    expect(contrastRatio(themeColor('ink'), '#e85f50')).toBeGreaterThanOrEqual(4.5);
-  });
+  it.each(['light', 'dark'] as const)(
+    'uses dark on-accent text on the coral backgrounds in the %s theme',
+    (theme) => {
+      expect(contrastRatio(themeColor('on-accent', theme), themeColor('accent', theme))).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(themeColor('on-accent', theme), themeColor('accent-hover', theme))).toBeGreaterThanOrEqual(4.5);
+    },
+  );
 
-  it('keeps the rendered CTA text ink at AA contrast for its actual hover background', () => {
+  it('keeps the rendered CTA semantic and at AA contrast for both theme palettes', () => {
     render(<ContinueLink />);
     const cta = screen.getByRole('link', { name: 'เริ่มบทแรก' });
-    const hoverColor = hoverBackground(cta);
 
-    expect(cta).toHaveClass('bg-coral', 'text-ink');
+    expect(cta).toHaveClass('bg-accent', 'text-on-accent', 'hover:bg-accent-hover');
     expect(cta).not.toHaveClass('text-white');
-    expect(contrastRatio(themeColor('ink'), themeColor('coral'))).toBeGreaterThanOrEqual(4.5);
-    expect(contrastRatio(themeColor('ink'), hoverColor)).toBeGreaterThanOrEqual(4.5);
+    for (const theme of ['light', 'dark'] as const) {
+      expect(contrastRatio(themeColor('on-accent', theme), themeColor('accent', theme))).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(themeColor('on-accent', theme), themeColor('accent-hover', theme))).toBeGreaterThanOrEqual(4.5);
+    }
 
     fireEvent.mouseOver(cta);
-    expect(cta).toHaveClass('text-ink');
-    expect(hoverBackground(cta)).toBe(hoverColor);
+    expect(cta).toHaveClass('text-on-accent', 'hover:bg-accent-hover');
+  });
+
+  it('keeps the continue panel dark with inverse foreground tokens in both themes', () => {
+    render(<ContinueLink />);
+    const panel = screen.getByRole('heading', { name: 'เส้นทางถัดไปของคุณ' }).closest('section');
+
+    expect(panel).toHaveClass('bg-inverse', 'text-on-inverse');
+    for (const theme of ['light', 'dark'] as const) {
+      expect(contrastRatio(themeColor('on-inverse', theme), themeColor('inverse', theme))).toBeGreaterThanOrEqual(4.5);
+    }
   });
 });

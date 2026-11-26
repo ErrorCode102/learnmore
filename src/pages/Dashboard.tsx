@@ -47,7 +47,7 @@ const overviewCards = [
     description:
       'เข้าใจ Session และ JWT จากแนวคิดจนถึงการป้องกันข้อผิดพลาดทางความปลอดภัยพื้นฐาน',
     tag: 'Security',
-    tone: 'bg-[#edf7f3] text-[#287a5b]',
+    tone: 'bg-soft-success text-success',
   },
 ] as const;
 
@@ -101,7 +101,7 @@ export function Dashboard() {
           <div className="mt-9 flex flex-col items-start gap-5 sm:flex-row sm:items-center">
             <Link
               to={`/lesson/${continueSelection?.lesson.id ?? 'overview'}`}
-              className="group inline-flex min-h-12 items-center justify-center gap-3 rounded-xl bg-brand px-6 py-3 text-sm font-semibold text-white shadow-[0_14px_32px_-14px_rgba(79,70,229,0.8)] transition-colors hover:bg-brand-deep"
+              className="group inline-flex min-h-12 items-center justify-center gap-3 rounded-xl bg-brand-solid px-6 py-3 text-sm font-semibold text-on-inverse shadow-[0_14px_32px_-14px_rgba(79,70,229,0.8)] transition-colors hover:bg-brand-solid-hover"
             >
               เริ่มเรียน
               <ArrowRight
@@ -114,7 +114,7 @@ export function Dashboard() {
               to="/demo"
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-line bg-surface px-5 py-3 text-sm font-semibold text-ink transition-colors hover:border-brand/30 hover:text-brand"
             >
-              <ShieldCheck aria-hidden="true" className="h-4 w-4 text-[#287a5b]" />
+              <ShieldCheck aria-hidden="true" className="h-4 w-4 text-success" />
               ดู Demo Authentication
             </Link>
           </div>
@@ -139,7 +139,7 @@ export function Dashboard() {
               </div>
             </div>
             <div className="flex items-start gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#edf7f3] text-[#287a5b]">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-soft-success text-success">
                 <Check aria-hidden="true" className="h-4 w-4" />
               </span>
               <div>
@@ -152,7 +152,7 @@ export function Dashboard() {
 
         <aside
           aria-labelledby="learning-path-title"
-          className="preview-shadow relative overflow-hidden rounded-[1.75rem] border border-white bg-surface p-6 sm:p-8"
+          className="preview-shadow relative overflow-hidden rounded-[1.75rem] border border-line bg-surface p-6 sm:p-8"
         >
           <div
             aria-hidden="true"
@@ -206,7 +206,7 @@ export function Dashboard() {
 
           <div
             aria-hidden="true"
-            className="mt-8 flex items-center justify-between rounded-xl bg-ink px-4 py-3.5 font-mono text-[11px] text-white/85"
+            className="mt-8 flex items-center justify-between rounded-xl bg-inverse px-4 py-3.5 font-mono text-[11px] text-on-inverse/85"
           >
             <span>POST /api/register</span>
             <span className="flex items-center gap-1.5 text-emerald-300">

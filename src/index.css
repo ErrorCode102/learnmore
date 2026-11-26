@@ -7,7 +7,18 @@
   --color-muted: var(--muted);
   --color-brand: var(--brand);
   --color-brand-deep: var(--brand-deep);
+  --color-brand-solid: var(--brand-solid);
+  --color-brand-solid-hover: var(--brand-solid-hover);
   --color-coral: var(--coral);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-on-accent: var(--on-accent);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+  --color-success-border: var(--success-border);
+  --color-soft-success: var(--soft-success);
+  --color-inverse: var(--inverse);
+  --color-on-inverse: var(--on-inverse);
   --color-line: var(--line);
   --color-soft-brand: var(--soft-brand);
   --color-soft-coral: var(--soft-coral);
@@ -16,17 +27,30 @@
 
 :root {
   --ink: #17223b;
-  --muted: #667085;
+  --muted: #5f6878;
   --brand: #4f46e5;
   --brand-deep: #3730a3;
+  --brand-solid: #4f46e5;
+  --brand-solid-hover: #3730a3;
   --surface: #fffefb;
   --canvas: #f5f3ed;
-  --coral: #f97362;
+  --coral: #b54735;
+  --accent: #f97362;
+  --accent-hover: #e85f50;
+  --on-accent: #17223b;
+  --danger: #b42318;
+  --success: #287a5b;
+  --success-border: #b7ddcb;
+  --soft-success: #edf7f3;
+  --inverse: #17223b;
+  --on-inverse: #ffffff;
   --line: #e4e2db;
   --soft-brand: #eef0ff;
   --soft-coral: #fff1ec;
+  --grid-line: rgb(23 34 59 / 0.045);
   --font-thai: "Noto Sans Thai", "Leelawadee UI", Thonburi, Tahoma, "Segoe UI", sans-serif;
 
+  color-scheme: light;
   font-family: var(--font-thai);
   color: var(--ink);
   background: var(--canvas);
@@ -34,6 +58,33 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+:root[data-theme="dark"] {
+  --ink: #f3f5fb;
+  --muted: #aeb8ca;
+  --brand: #a5b4fc;
+  --brand-deep: #c7d2fe;
+  --brand-solid: #4f46e5;
+  --brand-solid-hover: #3730a3;
+  --surface: #171e2d;
+  --canvas: #0f1522;
+  --coral: #ff9d8f;
+  --accent: #f97362;
+  --accent-hover: #e85f50;
+  --on-accent: #17223b;
+  --danger: #ffb4ab;
+  --success: #8de0b9;
+  --success-border: #285c48;
+  --soft-success: #15352c;
+  --inverse: #17223b;
+  --on-inverse: #ffffff;
+  --line: #30384b;
+  --soft-brand: #24264a;
+  --soft-coral: #3a2226;
+  --grid-line: rgb(255 255 255 / 0.04);
+
+  color-scheme: dark;
 }
 
 html {
@@ -66,8 +117,8 @@ a {
 
 .classroom-grid {
   background-image:
-    linear-gradient(to right, rgb(23 34 59 / 0.045) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(23 34 59 / 0.045) 1px, transparent 1px);
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
   background-size: 44px 44px;
   mask-image: linear-gradient(to bottom, black 15%, transparent 90%);
 }

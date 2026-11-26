@@ -3,6 +3,7 @@ import { webcrypto } from 'node:crypto';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../App';
+import themeCss from '../index.css?raw';
 import { logout, registerUser, resetDemoData } from '../lib/authDemo';
 
 const USERS_KEY = 'auth-classroom:demo-users:v1';
@@ -12,6 +13,15 @@ const account = {
   email: 'student@example.com',
   password: 'StudyPass1!',
 };
+
+let originalLocks: PropertyDescriptor | undefined;
+
+function installWebLocks() {
+  Object.defineProperty(navigator, 'locks', {
+    configurable: true,
+    value: { request: async (_name: string, callback: () => unknown) => callback() },
+  });
+}
 
 function renderDemo() {
   window.location.hash = '#/demo';
@@ -33,11 +43,18 @@ beforeEach(() => {
   vi.stubGlobal('crypto', webcrypto);
   window.localStorage.clear();
   window.sessionStorage.clear();
+  originalLocks = Object.getOwnPropertyDescriptor(navigator, 'locks');
+  installWebLocks();
   vi.spyOn(window, 'confirm').mockReturnValue(true);
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  if (originalLocks) {
+    Object.defineProperty(navigator, 'locks', originalLocks);
+  } else {
+    Reflect.deleteProperty(navigator, 'locks');
+  }
 });
 
 describe('Authentication Demo page', () => {
@@ -48,8 +65,23 @@ describe('Authentication Demo page', () => {
     expect(screen.getAllByRole('main')).toHaveLength(1);
     expect(screen.getByText(/Demo นี้ไม่ใช่ production authentication/i)).toBeVisible();
     expect(screen.getByRole('button', { name: 'สมัครสมาชิก' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'สมัครสมาชิก' })).toHaveClass(
+      'bg-brand-solid',
+      'text-on-inverse',
+    );
+    expect(screen.getByRole('button', { name: 'สร้างบัญชี Demo' })).toHaveClass(
+      'bg-brand-solid',
+      'text-on-inverse',
+    );
+    expect(
+      screen.getByRole('heading', { name: 'เกิดอะไรขึ้นเบื้องหลัง?' }).closest('section'),
+    ).toHaveClass('bg-inverse', 'text-on-inverse');
     expect(screen.getByLabelText('ชื่อที่แสดง')).toBeVisible();
     expect(screen.getByText('8–72 ตัว')).toBeVisible();
+    const failureIcon = screen.getByText('8–72 ตัว').closest('li')?.querySelector('svg');
+    expect(failureIcon).not.toBeNull();
+    expect(failureIcon).toHaveClass('text-danger');
+    expect(themeCss).toMatch(/--danger:\s*#b42318/);
   });
 
   it('switches between register and login without exposing the name field in login mode', () => {
@@ -69,6 +101,7 @@ describe('Authentication Demo page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'สร้างบัญชี Demo' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('รหัสผ่านต้องมี 8–72 ตัว');
+    expect(screen.getByRole('alert')).toHaveClass('text-danger');
     expect(window.localStorage.getItem(USERS_KEY)).toBeNull();
   });
 
@@ -112,6 +145,30 @@ describe('Authentication Demo page', () => {
     expect(await screen.findByRole('heading', { name: 'ทดลองใช้งานสำเร็จ' })).toBeVisible();
   });
 
+  it('keeps the dashboard and reports an error when logout storage fails', async () => {
+    await registerUser(account);
+    renderDemo();
+    await screen.findByRole('heading', { name: 'ทดลองใช้งานสำเร็จ' });
+    const removeItem = Storage.prototype.removeItem;
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(function (
+      this: Storage,
+      key: string,
+    ) {
+      if (this === window.sessionStorage) {
+        throw new DOMException('Storage blocked', 'SecurityError');
+      }
+      removeItem.call(this, key);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'ออกจากระบบ' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'ไม่สามารถออกจากระบบในเบราว์เซอร์นี้ได้',
+    );
+    expect(screen.getByRole('heading', { name: 'ทดลองใช้งานสำเร็จ' })).toBeVisible();
+    expect(window.sessionStorage.getItem(SESSION_KEY)).not.toBeNull();
+  });
+
   it('requires confirmation before clearing demo users and session', async () => {
     await registerUser(account);
     renderDemo();
@@ -136,6 +193,33 @@ describe('Authentication Demo page', () => {
 
     expect(window.localStorage.getItem(USERS_KEY)).not.toBeNull();
     expect(screen.getByRole('heading', { name: 'ทดลองใช้งานสำเร็จ' })).toBeVisible();
+  });
+
+  it('reports reset failure without claiming the stored account was deleted', async () => {
+    await registerUser(account);
+    renderDemo();
+    await screen.findByRole('heading', { name: 'ทดลองใช้งานสำเร็จ' });
+    const removeItem = Storage.prototype.removeItem;
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(function (
+      this: Storage,
+      key: string,
+    ) {
+      if (this === window.localStorage) {
+        throw new DOMException('Storage blocked', 'SecurityError');
+      }
+      removeItem.call(this, key);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'ล้างข้อมูล Demo' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'ไม่สามารถล้างข้อมูล Demo ในเบราว์เซอร์นี้ได้',
+    );
+    expect(window.localStorage.getItem(USERS_KEY)).not.toBeNull();
+    expect(window.sessionStorage.getItem(SESSION_KEY)).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'ทดลองใช้งานสำเร็จ' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'สร้างบัญชี Demo' })).toBeVisible();
+    expect(screen.queryByText('ล้างข้อมูล Demo แล้ว พร้อมเริ่มทดลองใหม่')).not.toBeInTheDocument();
   });
 
   it('restores a valid session when the page is reopened', async () => {

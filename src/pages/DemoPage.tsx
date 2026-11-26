@@ -23,7 +23,7 @@ import {
 type DemoMode = 'register' | 'login';
 
 const inputClassName =
-  'mt-2 min-h-12 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink outline-none transition-colors placeholder:text-muted/60 focus:border-brand';
+  'mt-2 min-h-12 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink outline-none transition-colors placeholder:text-muted focus:border-brand';
 
 export function DemoPage() {
   const [mode, setMode] = useState<DemoMode>('register');
@@ -68,10 +68,16 @@ export function DemoPage() {
   }
 
   function handleLogout() {
-    logout();
+    setError('');
+    try {
+      logout();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'ไม่สามารถออกจากระบบได้');
+      return;
+    }
+
     setSession(null);
     setPassword('');
-    setError('');
     switchMode('login');
     setSuccess('ออกจากระบบแล้ว ผู้ใช้ Demo ยังคงอยู่สำหรับการเข้าสู่ระบบครั้งถัดไป');
   }
@@ -84,7 +90,14 @@ export function DemoPage() {
       return;
     }
 
-    resetDemoData();
+    try {
+      resetDemoData();
+    } catch (caught) {
+      setSession(readSession());
+      setError(caught instanceof Error ? caught.message : 'ไม่สามารถล้างข้อมูล Demo ได้');
+      return;
+    }
+
     setSession(null);
     setName('');
     setEmail('');
@@ -124,7 +137,7 @@ export function DemoPage() {
       {session ? (
         <section className="mt-8 overflow-hidden rounded-[1.75rem] border border-line bg-surface shadow-[0_24px_70px_-45px_rgba(23,34,59,0.55)]">
           <div className="border-b border-line bg-soft-brand/60 p-6 sm:p-8">
-            <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand text-white">
+            <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-solid text-on-inverse">
               <UserRound aria-hidden="true" className="h-6 w-6" />
             </span>
             <p className="mt-5 text-xs font-semibold tracking-[0.16em] text-brand">SESSION ACTIVE</p>
@@ -151,7 +164,7 @@ export function DemoPage() {
               <button
                 type="button"
                 onClick={handleLogout}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-ink px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-deep"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-inverse px-5 py-3 text-sm font-semibold text-on-inverse transition-colors hover:bg-brand-solid-hover"
               >
                 <LogOut aria-hidden="true" className="h-4 w-4" />
                 ออกจากระบบ
@@ -166,6 +179,12 @@ export function DemoPage() {
               </button>
             </div>
           </div>
+          {error && (
+            <div role="alert" className="flex items-start gap-2 border-t border-coral/25 bg-soft-coral px-6 py-4 text-sm text-danger sm:px-8">
+              <CircleAlert aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
           {success && (
             <p role="status" className="border-t border-line bg-canvas/60 px-6 py-4 text-sm text-brand sm:px-8">
               {success}
@@ -181,7 +200,7 @@ export function DemoPage() {
                 onClick={() => switchMode('register')}
                 aria-pressed={mode === 'register'}
                 className={`min-h-11 rounded-lg px-3 text-sm font-semibold transition-colors ${
-                  mode === 'register' ? 'bg-brand text-white' : 'text-muted hover:text-ink'
+                  mode === 'register' ? 'bg-brand-solid text-on-inverse' : 'text-muted hover:text-ink'
                 }`}
               >
                 สมัครสมาชิก
@@ -191,7 +210,7 @@ export function DemoPage() {
                 onClick={() => switchMode('login')}
                 aria-pressed={mode === 'login'}
                 className={`min-h-11 rounded-lg px-3 text-sm font-semibold transition-colors ${
-                  mode === 'login' ? 'bg-brand text-white' : 'text-muted hover:text-ink'
+                  mode === 'login' ? 'bg-brand-solid text-on-inverse' : 'text-muted hover:text-ink'
                 }`}
               >
                 เข้าสู่ระบบ
@@ -257,7 +276,7 @@ export function DemoPage() {
               {mode === 'register' && <PasswordChecklist password={password} />}
 
               {error && (
-                <div role="alert" className="flex items-start gap-2 rounded-xl border border-coral/25 bg-soft-coral p-4 text-sm text-coral">
+                <div role="alert" className="flex items-start gap-2 rounded-xl border border-coral/25 bg-soft-coral p-4 text-sm text-danger">
                   <CircleAlert aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
                   <span>{error}</span>
                 </div>
@@ -271,7 +290,7 @@ export function DemoPage() {
               <button
                 type="submit"
                 disabled={busy}
-                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-deep disabled:cursor-wait disabled:opacity-60"
+                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand-solid px-5 py-3 text-sm font-semibold text-on-inverse transition-colors hover:bg-brand-solid-hover disabled:cursor-wait disabled:opacity-60"
               >
                 {busy ? (
                   <RotateCcw aria-hidden="true" className="h-4 w-4 animate-spin" />
@@ -288,8 +307,8 @@ export function DemoPage() {
           </section>
 
           <aside className="space-y-5">
-            <section className="rounded-[1.75rem] border border-line bg-ink p-6 text-white sm:p-7">
-              <KeyRound aria-hidden="true" className="h-6 w-6 text-coral" />
+            <section className="rounded-[1.75rem] border border-line bg-inverse p-6 text-on-inverse sm:p-7">
+              <KeyRound aria-hidden="true" className="h-6 w-6 text-accent" />
               <h2 className="mt-5 text-xl font-semibold">เกิดอะไรขึ้นเบื้องหลัง?</h2>
               <ol className="mt-5 space-y-5">
                 {[
@@ -299,10 +318,10 @@ export function DemoPage() {
                   ['04', 'เปิด session', 'sessionStorage เก็บข้อมูลผู้ใช้ที่จำเป็นต่อ tab นี้'],
                 ].map(([number, title, description]) => (
                   <li key={number} className="flex gap-4">
-                    <span className="text-xs font-semibold text-coral">{number}</span>
+                    <span className="text-xs font-semibold text-accent">{number}</span>
                     <div>
                       <p className="text-sm font-semibold">{title}</p>
-                      <p className="mt-1 text-xs leading-6 text-white/65">{description}</p>
+                      <p className="mt-1 text-xs leading-6 text-on-inverse/65">{description}</p>
                     </div>
                   </li>
                 ))}

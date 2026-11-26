@@ -9,6 +9,24 @@
       content="AuthLab ห้องเรียน Authentication ภาษาไทยสำหรับนักศึกษา ปวช. และ ปวส."
     />
     <title>AuthLab — ห้องเรียน Authentication</title>
+    <script id="theme-bootstrap">
+      (function () {
+        var key = 'auth-classroom:theme:v1';
+        var preference = 'system';
+        try {
+          var stored = localStorage.getItem(key);
+          if (stored === 'light' || stored === 'dark' || stored === 'system') {
+            preference = stored;
+          }
+        } catch (_) {}
+        var dark = preference === 'dark' || (preference === 'system' && typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches);
+        var theme = dark ? 'dark' : 'light';
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', dark ? '#0f1522' : '#f5f3ed');
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

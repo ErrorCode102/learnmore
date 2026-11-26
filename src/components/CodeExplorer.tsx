@@ -118,7 +118,7 @@ export function CodeExplorer({ snippet }: { snippet: CodeSnippet }) {
 
         <aside
           aria-label="รายละเอียดบรรทัด"
-          className="min-w-0 border-t border-white/10 bg-white p-5 text-ink lg:min-h-full lg:border-l lg:border-t-0"
+          className="min-w-0 border-t border-line bg-surface p-5 text-ink lg:min-h-full lg:border-l lg:border-t-0"
         >
           <div aria-live="polite" aria-atomic="true">
             <p className="text-[10px] font-semibold tracking-[0.16em] text-brand">LINE NOTE</p>

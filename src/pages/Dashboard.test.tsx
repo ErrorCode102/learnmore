@@ -54,7 +54,7 @@ describe('Dashboard', () => {
     }
   });
 
-  it('shows the eight certificate lessons and the preserved hero by default', () => {
+  it('preserves the hero and uses theme-safe action and status colors', () => {
     renderAt();
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
@@ -64,10 +64,26 @@ describe('Dashboard', () => {
       'href',
       '#/lesson/overview',
     );
+    expect(screen.getByRole('link', { name: 'เริ่มเรียน' })).toHaveClass(
+      'bg-brand-solid',
+      'text-on-inverse',
+    );
+    expect(
+      screen.getByRole('heading', { name: 'Authentication ที่เป็นระบบ' }).closest('article')?.querySelector('span'),
+    ).toHaveClass('bg-soft-success', 'text-success');
+    expect(screen.getByText('POST /api/register').parentElement).toHaveClass(
+      'bg-inverse',
+      'text-on-inverse/85',
+    );
     expect(screen.getByRole('link', { name: /ดู Demo Authentication/i })).toHaveAttribute(
       'href',
       '#/demo',
     );
+  });
+
+  it('shows the eight certificate lessons by default', () => {
+    renderAt();
+
     expect(screen.getByRole('button', { name: 'ปวช.' })).toHaveAttribute(
       'aria-pressed',
       'true',
@@ -124,8 +140,8 @@ describe('Dashboard', () => {
     expect(screen.getByText('4/5')).toBeVisible();
   });
 
-  it('continues from the first incomplete lesson and reviews the final lesson when complete', () => {
-    const { unmount } = renderAt();
+  it('starts from the overview lesson', () => {
+    renderAt();
 
     expect(screen.getByRole('link', { name: 'เริ่มเรียน' })).toHaveAttribute(
       'href',
@@ -135,8 +151,9 @@ describe('Dashboard', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       'ภาพรวมระบบ Authentication',
     );
+  });
 
-    unmount();
+  it('continues from the first incomplete lesson', () => {
     saveProgress({
       version: 1,
       level: 'certificate',
@@ -147,6 +164,7 @@ describe('Dashboard', () => {
       quizScores: {},
     });
     const progressed = renderAt();
+
     expect(screen.getByRole('link', { name: 'เรียนต่อ' })).toHaveAttribute(
       'href',
       '#/lesson/installation',
@@ -156,8 +174,9 @@ describe('Dashboard', () => {
         name: 'เริ่มเรียน',
       }),
     ).toHaveAttribute('href', '#/lesson/installation');
+  });
 
-    unmount();
+  it('reviews the final lesson when the track is complete', () => {
     saveProgress({
       version: 1,
       level: 'certificate',
@@ -168,6 +187,7 @@ describe('Dashboard', () => {
       quizScores: {},
     });
     const completed = renderAt();
+
     expect(screen.getByRole('link', { name: 'ทบทวนบทสุดท้าย' })).toHaveAttribute(
       'href',
       '#/lesson/testing',

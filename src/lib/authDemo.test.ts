@@ -13,20 +13,35 @@ import {
 
 const USERS_KEY = 'auth-classroom:demo-users:v1';
 const SESSION_KEY = 'auth-classroom:demo-session:v1';
+const REGISTRATION_LOCK = 'auth-classroom:demo-register';
 const validInput = {
   name: 'นักศึกษา AuthLab',
   email: 'Student@Example.com',
   password: 'StudyPass1!',
 };
 
+let originalLocks: PropertyDescriptor | undefined;
+let lockRequest: ReturnType<typeof vi.fn>;
+
 beforeEach(() => {
   vi.stubGlobal('crypto', webcrypto);
   window.localStorage.clear();
   window.sessionStorage.clear();
+  originalLocks = Object.getOwnPropertyDescriptor(navigator, 'locks');
+  lockRequest = vi.fn(async (_name: string, callback: () => unknown) => callback());
+  Object.defineProperty(navigator, 'locks', {
+    configurable: true,
+    value: { request: lockRequest },
+  });
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  if (originalLocks) {
+    Object.defineProperty(navigator, 'locks', originalLocks);
+  } else {
+    Reflect.deleteProperty(navigator, 'locks');
+  }
 });
 
 describe('browser password hashing', () => {
@@ -85,6 +100,49 @@ describe('demo registration and login', () => {
     expect(JSON.parse(window.localStorage.getItem(USERS_KEY) ?? '[]')).toHaveLength(1);
   });
 
+  it('serializes the storage write through a named Web Lock', async () => {
+    await registerUser(validInput);
+
+    expect(lockRequest).toHaveBeenCalledWith(REGISTRATION_LOCK, expect.any(Function));
+  });
+
+  it('keeps both accounts when two registrations share the lock', async () => {
+    let activeLocks = 0;
+    let maximumActiveLocks = 0;
+    let lockQueue = Promise.resolve();
+    lockRequest.mockImplementation((_name: string, callback: () => unknown) => {
+      const result = lockQueue.then(async () => {
+        activeLocks += 1;
+        maximumActiveLocks = Math.max(maximumActiveLocks, activeLocks);
+        try {
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          return await callback();
+        } finally {
+          activeLocks -= 1;
+        }
+      });
+      lockQueue = result.then(() => undefined, () => undefined);
+      return result;
+    });
+
+    await Promise.all([
+      registerUser(validInput),
+      registerUser({ ...validInput, email: 'second@example.com' }),
+    ]);
+
+    expect(maximumActiveLocks).toBe(1);
+    expect(JSON.parse(window.localStorage.getItem(USERS_KEY) ?? '[]')).toHaveLength(2);
+  });
+
+  it('explains that registration needs Web Locks when the API is unavailable', async () => {
+    Reflect.deleteProperty(navigator, 'locks');
+
+    await expect(registerUser(validInput)).rejects.toThrow(
+      'เบราว์เซอร์นี้ไม่รองรับ Web Locks สำหรับ Demo กรุณาใช้ HTTPS หรือ localhost',
+    );
+    expect(window.localStorage.getItem(USERS_KEY)).toBeNull();
+  });
+
   it.each([
     [{ ...validInput, name: ' ' }, 'กรุณาใส่ชื่อที่แสดง'],
     [{ ...validInput, email: 'not-an-email' }, 'กรุณาใส่อีเมลที่ถูกต้อง'],
@@ -133,6 +191,23 @@ describe('demo session lifecycle', () => {
     expect(readSession()).toBeNull();
   });
 
+  it('reports logout failure instead of pretending the session was removed', async () => {
+    await registerUser(validInput);
+    const removeItem = Storage.prototype.removeItem;
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(function (
+      this: Storage,
+      key: string,
+    ) {
+      if (this === window.sessionStorage) {
+        throw new DOMException('Storage blocked', 'SecurityError');
+      }
+      removeItem.call(this, key);
+    });
+
+    expect(() => logout()).toThrow('ไม่สามารถออกจากระบบในเบราว์เซอร์นี้ได้');
+    expect(window.sessionStorage.getItem(SESSION_KEY)).not.toBeNull();
+  });
+
   it('discards a stale session when its user no longer exists', async () => {
     await registerUser(validInput);
     window.localStorage.setItem(USERS_KEY, '[]');
@@ -152,5 +227,22 @@ describe('demo session lifecycle', () => {
 
     expect(window.localStorage.getItem(USERS_KEY)).toBeNull();
     expect(window.sessionStorage.getItem(SESSION_KEY)).toBeNull();
+  });
+
+  it('attempts both reset removals and propagates storage failure', async () => {
+    await registerUser(validInput);
+    const removeItem = Storage.prototype.removeItem;
+    const removeItemSpy = vi
+      .spyOn(Storage.prototype, 'removeItem')
+      .mockImplementation(function (this: Storage, key: string) {
+        if (this === window.localStorage) {
+          throw new DOMException('Storage blocked', 'SecurityError');
+        }
+        removeItem.call(this, key);
+      });
+
+    expect(() => resetDemoData()).toThrow('ไม่สามารถล้างข้อมูล Demo ในเบราว์เซอร์นี้ได้');
+    expect(removeItemSpy).toHaveBeenCalledWith(SESSION_KEY);
+    expect(window.localStorage.getItem(USERS_KEY)).not.toBeNull();
   });
 });

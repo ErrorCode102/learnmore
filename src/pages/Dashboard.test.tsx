@@ -217,6 +217,29 @@ describe('Dashboard', () => {
     expect(scrollIntoView.mock.instances.at(-1)).toBe(document.getElementById('course-map'));
   });
 
+  it('focuses the new lesson main content and resets scroll from a course-map card', async () => {
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+    renderAt();
+
+    try {
+      scrollTo.mockClear();
+      const lessonLink = courseMap().getByRole('link', { name: /ภาพรวมระบบ Authentication/ });
+      lessonLink.focus();
+      fireEvent.click(lessonLink);
+
+      await waitFor(() => {
+        expect(document.getElementById('main-content')).toHaveFocus();
+        expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'instant' });
+      });
+      expect(window.location.hash).toBe('#/lesson/overview');
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+        'ภาพรวมระบบ Authentication',
+      );
+    } finally {
+      scrollTo.mockRestore();
+    }
+  });
+
   it('cites the supplied foundations without presenting invented sub-scores', () => {
     renderAt();
 

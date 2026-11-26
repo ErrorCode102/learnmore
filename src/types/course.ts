@@ -11,6 +11,34 @@ export interface LessonSummary {
   outcomes: string[];
   tags: string[];
 }
+export type CodeLanguage = 'bash' | 'sql' | 'javascript' | 'vue' | 'json' | 'text';
+export interface CodeSnippet {
+  id: string;
+  filename: string;
+  language: CodeLanguage;
+  code: string;
+  notes: string[];
+  caption?: string;
+}
+export interface LessonCallout {
+  tone: 'info' | 'warning' | 'success';
+  title: string;
+  text: string;
+}
+export interface LessonSection {
+  id: string;
+  title: string;
+  body: string[];
+  bullets?: string[];
+  snippets?: CodeSnippet[];
+  callouts?: LessonCallout[];
+  diplomaNote?: string;
+}
+export interface LessonContent extends LessonSummary {
+  intro: string;
+  sections: LessonSection[];
+  checkpoint: { summary: string; checklist: string[] };
+}
 export interface ProgressState {
   version: 1;
   level: Level;

@@ -1,6 +1,6 @@
 # Task 3 Report — Dashboard, course map และ lesson navigation
 
-**Status:** DONE
+**Status:** REVIEW FIXES VERIFIED
 
 ## Scope
 
@@ -64,6 +64,28 @@ Implemented Task 3 in `C:/Users/PTC/Documents/Qoder/2026-11-25/7643741e` only. D
 - `npm run typecheck` — exit 0; `tsc -b --pretty false` reported no errors. An initial unused test import was removed before this passing run.
 - `npm run build` — exit 0; TypeScript build and Vite production build passed, transforming 1,602 modules and emitting `dist/index.html`, CSS, and JS.
 - No Git commands were run and no subagents were spawned.
+
+## Independent review fix round
+
+Review basis: `.superpowers/sdd/2026-11-25-authlab-classroom/task-3-review.md` (2 Important, 2 Minor). The externally committed `94da894` working tree already contained the production fixes and their initial regression tests, so this continuation verified them, strengthened the remaining coverage, and did not rewrite working production behavior.
+
+### Finding resolution
+
+- **Important 1 — route focus/scroll:** `src/components/AppShell.tsx` owns the post-route effect. Ordinary navigation calls `window.scrollTo({ top: 0, behavior: 'instant' })` and focuses `#main-content` with `{ preventScroll: true }`; `#course-map` waits for the committed route, then calls `scrollIntoView({ block: 'start' })` and focuses the map. `src/pages/Dashboard.tsx` no longer has a duplicate hash effect. Integration coverage includes next-lesson navigation, breadcrumb return, direct fragment load, fragment-to-home return, and course-map-card navigation.
+- **Important 2 — CTA contrast:** `src/components/ContinueCard.tsx` uses `text-ink` on coral in both normal and hover states. `src/components/ContinueCard.test.tsx` calculates WCAG contrast from the theme tokens and the CTA's actual hover class: 5.764:1 on `#f97362` and 4.655:1 on `#e85f50`, both above 4.5:1.
+- **Minor 1 — behavioral navigation coverage:** tests assert dynamic hero hrefs for progressed and complete tracks, `#/#course-map` URLs and targeted scroll calls, skip-link default prevention/focus without rerouting, and `aria-current="page"` on root home, lesson routes, practice, and demo.
+- **Minor 2 — sticky mobile navigation:** `src/components/AppShell.tsx` uses `overflow-x-clip`, not `overflow-x-hidden`. A real headless Chrome check at 360×800 confirmed computed `overflow-x: clip`, sticky navigation at `top: 0` after scrolling to `scrollY: 600`, and document/body scroll widths of 360 px before and after scrolling. Decorative blur did not create horizontal overflow.
+
+### Fix-round TDD and verification evidence
+
+- Preserved prior RED evidence: `C:/Users/PTC/AppData/Local/Temp/task3-round1-red.log` recorded 7 expected failures across the four review test files before the production fixes; the dynamic-hero RED case is preserved in `C:/Users/PTC/AppData/Local/Temp/task3-dashboard-red.log`.
+- Baseline on `94da894`: `npm test` passed 8 files and 47/47 tests.
+- This round added course-map-card focus/scroll integration coverage, root-home `aria-current` coverage, and actual-hover-color contrast coupling. Focused review tests passed 4 files and 26/26 tests.
+- `npm test` — exit 0; 8 files and 48/48 tests passed.
+- `npm run typecheck` — exit 0; no TypeScript errors.
+- `npm run build` — exit 0; 1,602 modules transformed and production assets emitted.
+- Real-browser 360 px sticky/overflow check — exit 0; all layout assertions passed.
+- `git diff --check` — exit 0; no whitespace errors. Only read-only Git inspection was used; no commits, staging, branch changes, or ledger edits were made.
 
 ## Self-review
 

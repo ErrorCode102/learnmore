@@ -50,6 +50,17 @@ function themeColor(name: 'ink' | 'coral') {
   return value;
 }
 
+function hoverBackground(cta: HTMLElement) {
+  const hoverClass = Array.from(cta.classList).find((className) =>
+    className.startsWith('hover:bg-[#'),
+  );
+  const color = hoverClass?.match(/#[\da-fA-F]{6}/)?.[0];
+  if (!color) {
+    throw new Error('Expected the CTA to declare a six-digit hex hover background.');
+  }
+  return color;
+}
+
 function ContinueLink() {
   return (
     <MemoryRouter>
@@ -71,14 +82,18 @@ describe('ContinueCard CTA contrast', () => {
     expect(contrastRatio(themeColor('ink'), '#e85f50')).toBeGreaterThanOrEqual(4.5);
   });
 
-  it('keeps the rendered CTA text ink when hovered', () => {
+  it('keeps the rendered CTA text ink at AA contrast for its actual hover background', () => {
     render(<ContinueLink />);
     const cta = screen.getByRole('link', { name: 'เริ่มบทแรก' });
+    const hoverColor = hoverBackground(cta);
 
-    expect(cta).toHaveClass('text-ink');
+    expect(cta).toHaveClass('bg-coral', 'text-ink');
     expect(cta).not.toHaveClass('text-white');
+    expect(contrastRatio(themeColor('ink'), themeColor('coral'))).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(themeColor('ink'), hoverColor)).toBeGreaterThanOrEqual(4.5);
+
     fireEvent.mouseOver(cta);
     expect(cta).toHaveClass('text-ink');
-    expect(contrastRatio(themeColor('ink'), '#e85f50')).toBeGreaterThanOrEqual(4.5);
+    expect(hoverBackground(cta)).toBe(hoverColor);
   });
 });

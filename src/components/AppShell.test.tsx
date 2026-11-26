@@ -47,13 +47,15 @@ describe('AppShell navigation', () => {
     expect(window.location.hash).toBe('#/');
   });
 
-  it('keeps home current on lesson routes and activates practice and demo', () => {
-    renderAt('/lesson/overview');
+  it('marks home current on home and lesson routes and activates practice and demo', () => {
+    renderAt('/');
 
-    expect(within(primaryNavigation()).getByRole('link', { name: 'หน้าหลัก' })).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
+    const homeLink = within(primaryNavigation()).getByRole('link', { name: 'หน้าหลัก' });
+    expect(homeLink).toHaveAttribute('aria-current', 'page');
+
+    fireEvent.click(screen.getByRole('link', { name: 'เริ่มเรียน' }));
+    expect(window.location.hash).toBe('#/lesson/overview');
+    expect(homeLink).toHaveAttribute('aria-current', 'page');
     expect(within(primaryNavigation()).getByRole('link', { name: 'ฝึกท้ายบท' })).not.toHaveAttribute(
       'aria-current',
     );

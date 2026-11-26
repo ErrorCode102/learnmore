@@ -196,7 +196,7 @@ export function signAccessToken(user) {
       'ประกาศฟังก์ชันอ่าน secret และตรวจ configuration ก่อน sign token',
       'อ่าน JWT_SECRET จาก process.env ไม่ใช้ fallback ที่คาดเดาได้',
       'ปฏิเสธ secret ที่ว่างหรือสั้นกว่า 32 ตัวเพื่อลดการ guess',
-      'โยน error ให้ server ไม่เริ่มออก token ด้วย configuration อ่อนระонта',
+      'โยน error ให้ server ไม่เริ่มออก token ด้วย configuration ที่อ่อนเกินไป',
       'คืน secret ที่ผ่านการตรวจเพื่อส่งให้ jwt.sign',
       'เว้นบรรทัดเพื่อแยก configuration ออกจากการสร้าง token',
       'ส่งออกฟังก์ชัน sign ที่รับข้อมูลผู้ใช้ minimal',

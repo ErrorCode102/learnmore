@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Callout } from './Callout';
 import { CodeExplorer } from './CodeExplorer';
 import type { CodeSnippet } from '../types/course';
+import appStyles from '../index.css?raw';
 
 const snippet: CodeSnippet = {
   id: 'test-app-js',
@@ -37,6 +38,26 @@ function renderExplorer(value = snippet) {
   return render(<CodeExplorer snippet={value} />);
 }
 
+function parseColor(color: string) {
+  if (color.startsWith('#')) {
+    return [1, 3, 5].map((index) => Number.parseInt(color.slice(index, index + 2), 16));
+  }
+  return color.match(/[\d.]+/g)!.slice(0, 3).map(Number);
+}
+
+function contrastRatio(foreground: string, background: string) {
+  const luminance = (color: string) => {
+    const channels = parseColor(color).map((channel) => {
+      const scaled = channel / 255;
+      return scaled <= 0.04045 ? scaled / 12.92 : ((scaled + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+  };
+  const first = luminance(foreground);
+  const second = luminance(background);
+  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+}
+
 describe('CodeExplorer', () => {
   it('exports an explorer component', () => {
     expect(CodeExplorer).toBeTypeOf('function');
@@ -53,6 +74,35 @@ describe('CodeExplorer', () => {
     expect(screen.getByText(snippet.notes[0])).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'บรรทัด 2' }));
     expect(screen.getByText(snippet.notes[1])).toBeVisible();
+  });
+
+  it('renders Prism token categories in distinct visible colors', () => {
+    const tokenRules = appStyles.match(/\.token[^{}]+\{[^{}]*\}/g)?.join('\n') ?? '';
+    const style = document.createElement('style');
+    style.textContent = tokenRules;
+    document.head.append(style);
+
+    try {
+      const { container } = renderExplorer();
+      const keyword = container.querySelector('.token.keyword');
+      const string = container.querySelector('.token.string');
+
+      expect(keyword).not.toBeNull();
+      expect(string).not.toBeNull();
+      expect(keyword!.closest('section')).toHaveClass('bg-[#111827]');
+      expect(getComputedStyle(keyword!).color).not.toBe(getComputedStyle(string!).color);
+
+      const palette = [...tokenRules.matchAll(/color:\s*(#[0-9a-f]{6})/gi)].map((match) => match[1]);
+      const backgrounds = ['#111827', '#222946']; // bg-indigo-400/15 composited over #111827
+      expect(new Set(palette).size).toBeGreaterThan(5);
+      for (const color of palette) {
+        for (const background of backgrounds) {
+          expect(contrastRatio(color, background), `${color} on ${background}`).toBeGreaterThanOrEqual(4.5);
+        }
+      }
+    } finally {
+      style.remove();
+    }
   });
 
   it('updates the polite live detail panel through buttons and previous/next controls', () => {

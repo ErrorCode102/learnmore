@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">AuthLab</title>
+  <rect width="64" height="64" rx="16" fill="#4f46e5" />
+  <path d="M17 17h16c5 0 9 4 9 9v23H26c-5 0-9-4-9-9V17Z" fill="none" stroke="#fff" stroke-width="4" stroke-linejoin="round" />
+  <path d="M42 22h5c5 0 9 4 9 9v18c0 5-4 9-9 9h-5" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" />
+  <path d="M25 27h10M25 35h7" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" />
+</svg>

@@ -13,7 +13,7 @@ git --version
 where git
 code --version`,
     [
-      'ตรวจสอบเวอร์ชัน Node.js โดยควรใช้ LTS ที่แนะนำปัจจุบันและต้องไม่ต่ำกว่า reference floor 18',
+      'ตรวจสอบเวอร์ชัน Node.js โดยใช้ 20.19.0 ขึ้นไปในสาย 20 หรือ 22.12.0 ขึ้นไปเพื่อให้ Vite 7 รองรับ environment',
       'ตรวจสอบว่า npm ถูกติดตั้งมาพร้อม Node.js และสามารถเรียกใช้งานจาก Terminal ได้',
       'แสดงตำแหน่งไฟล์ executable ของ Node.js เพื่อยืนยันว่าใช้ตัวติดตั้งไม่ใช่โปรแกรมอื่น',
       'ตรวจสอบว่า MySQL หรือ MariaDB client มีคำสั่ง mysql ใน PATH ของ Windows',

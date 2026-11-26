@@ -38,9 +38,10 @@ const advancedBlueprints: Record<AdvancedLessonId, AdvancedBlueprint> = {
         body: [
           'Refresh route อ่าน cookie แทน JavaScript localStorage แล้ว rotate และออก access token ใหม่ HttpOnly ทำให้ XSS อ่าน cookie ไม่ได้โดยตรง แต่ token ยังถูกแนบอัตโนมัติจึงต้องป้องกัน CSRF',
           'Secure เปิดเฉพาะ production, SameSite=Lax ไม่ส่ง cookie บน cross-site POST โดยทั่วไป และ path จำกัดไว้ที่ /api/auth สำหรับ concept นี้ cookie-parser ติดตั้งจากบท Setup แล้ว route ตรวจ Origin allowlist ก่อน state-changing request',
+          'controller ตัวอย่างเรียก issueRefreshToken หลัง Register/Login สำเร็จ และลบผู้ใช้ใหม่เมื่อการออก refresh cookie เริ่มต้นล้มเหลวเป็น compensating cleanup; production ควรใช้ transaction ร่วมระหว่าง users กับ refresh_tokens เพื่อให้ atomic',
         ],
-        snippets: [securitySnippets[4], securitySnippets[6]],
-        bullets: ['Login/Register ที่ production ต้องเรียก issueRefreshToken หลังยืนยันสำเร็จ', 'Axios ที่ใช้ cookie ต้องตั้ง withCredentials และ CORS origin ให้ตรงกัน', 'Logout ต้อง revoke record และ clear cookie ด้วย options เดียวกัน', 'Browser Demo ใน AuthLab ไม่ใช่ production auth เพราะยังไม่มี flow ทั้งหมดนี้'],
+        snippets: [securitySnippets[7], securitySnippets[4], securitySnippets[6]],
+        bullets: ['Register/Login ต้องออก refresh cookie เริ่มต้นก่อนตอบ success', 'Axios ที่ใช้ cookie ต้องตั้ง withCredentials และ CORS origin ให้ตรงกัน', 'Logout ต้อง revoke record และ clear cookie ด้วย options เดียวกัน', 'Browser Demo ใน AuthLab ไม่ใช่ production auth เพราะยังไม่มี flow ทั้งหมดนี้'],
         callouts: [{ tone: 'warning', title: 'CSRF ไม่หายจาก HttpOnly', text: 'HttpOnly ป้องกันการอ่าน token ด้วย JavaScript ไม่ได้ป้องกัน browser การส่ง cookie ให้ attacker; ตัวอย่างนี้รวม SameSite=Lax กับ Origin allowlist และยังควรเพิ่ม CSRF token เมื่อ threat model ต้องการ defense เพิ่ม' }],
       },
       {

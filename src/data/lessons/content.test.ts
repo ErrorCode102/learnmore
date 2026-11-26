@@ -189,6 +189,18 @@ describe('AuthLab lesson content', () => {
     }
   });
 
+  it('requires Node.js releases supported by the Vite 7 workshop toolchain', () => {
+    const installationText = lessonText(contentCourse.getLessonContent('certificate', 'installation')!);
+    const setupText = lessonText(contentCourse.getLessonContent('certificate', 'setup')!);
+    const toolCheckNote = getSnippet('installation-windows-tool-check').notes[0];
+
+    for (const text of [installationText, setupText, toolCheckNote]) {
+      expect(text).toContain('20.19.0');
+      expect(text).toContain('22.12.0');
+      expect(text).not.toMatch(/reference floor 18|Node\.js 18 เป็น|v18 ขึ้นไป/);
+    }
+  });
+
   it('keeps the security model explicit and free of sample production secrets', () => {
     const securityText = lessonText(contentCourse.getLessonContent('diploma', 'security')!);
     expect(securityText).toContain('parameterized');

@@ -1,0 +1,870 @@
+diff --git a/src/components/CodeExplorer.test.tsx b/src/components/CodeExplorer.test.tsx
+index 6c39bd5..e18395a 100644
+--- a/src/components/CodeExplorer.test.tsx
++++ b/src/components/CodeExplorer.test.tsx
+@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
+ import { Callout } from './Callout';
+ import { CodeExplorer } from './CodeExplorer';
+ import type { CodeSnippet } from '../types/course';
++import appStyles from '../index.css?raw';
+ 
+ const snippet: CodeSnippet = {
+   id: 'test-app-js',
+@@ -37,6 +38,26 @@ function renderExplorer(value = snippet) {
+   return render(<CodeExplorer snippet={value} />);
+ }
+ 
++function parseColor(color: string) {
++  if (color.startsWith('#')) {
++    return [1, 3, 5].map((index) => Number.parseInt(color.slice(index, index + 2), 16));
++  }
++  return color.match(/[\d.]+/g)!.slice(0, 3).map(Number);
++}
++
++function contrastRatio(foreground: string, background: string) {
++  const luminance = (color: string) => {
++    const channels = parseColor(color).map((channel) => {
++      const scaled = channel / 255;
++      return scaled <= 0.04045 ? scaled / 12.92 : ((scaled + 0.055) / 1.055) ** 2.4;
++    });
++    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
++  };
++  const first = luminance(foreground);
++  const second = luminance(background);
++  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
++}
++
+ describe('CodeExplorer', () => {
+   it('exports an explorer component', () => {
+     expect(CodeExplorer).toBeTypeOf('function');
+@@ -55,6 +76,35 @@ describe('CodeExplorer', () => {
+     expect(screen.getByText(snippet.notes[1])).toBeVisible();
+   });
+ 
++  it('renders Prism token categories in distinct visible colors', () => {
++    const tokenRules = appStyles.match(/\.token[^{}]+\{[^{}]*\}/g)?.join('\n') ?? '';
++    const style = document.createElement('style');
++    style.textContent = tokenRules;
++    document.head.append(style);
++
++    try {
++      const { container } = renderExplorer();
++      const keyword = container.querySelector('.token.keyword');
++      const string = container.querySelector('.token.string');
++
++      expect(keyword).not.toBeNull();
++      expect(string).not.toBeNull();
++      expect(keyword!.closest('section')).toHaveClass('bg-[#111827]');
++      expect(getComputedStyle(keyword!).color).not.toBe(getComputedStyle(string!).color);
++
++      const palette = [...tokenRules.matchAll(/color:\s*(#[0-9a-f]{6})/gi)].map((match) => match[1]);
++      const backgrounds = ['#111827', '#222946']; // bg-indigo-400/15 composited over #111827
++      expect(new Set(palette).size).toBeGreaterThan(5);
++      for (const color of palette) {
++        for (const background of backgrounds) {
++          expect(contrastRatio(color, background), `${color} on ${background}`).toBeGreaterThanOrEqual(4.5);
++        }
++      }
++    } finally {
++      style.remove();
++    }
++  });
++
+   it('updates the polite live detail panel through buttons and previous/next controls', () => {
+     renderExplorer();
+     const detail = screen.getByRole('complementary', { name: 'รายละเอียดบรรทัด' });
+diff --git a/src/data/lessons/certificate.ts b/src/data/lessons/certificate.ts
+index 3761917..210e48a 100644
+--- a/src/data/lessons/certificate.ts
++++ b/src/data/lessons/certificate.ts
+@@ -177,21 +177,21 @@ const coreBlueprints: Record<CoreLessonId, CoreBlueprint> = {
+         id: 'install-runtime-tools',
+         title: 'ติดตั้ง Node.js, npm และ Editors',
+         body: [
+-          'ดาวน์โหลด Node.js LTS ปัจจุบันจาก https://nodejs.org/en/download แล้วตรวจให้เวอร์ชันไม่ต่ำกว่า reference floor 18 และแนะนำ current LTS เพราะ security fixes npm มาพร้อม Node.js จึงไม่ต้องติดตั้งแยก',
++          'ดาวน์โหลด Node.js LTS ปัจจุบันจาก https://nodejs.org/en/download แล้วใช้ Node.js 20.19.0 ขึ้นไปในสาย 20 หรือ 22.12.0 ขึ้นไป เพราะ Vite 7 ที่ใช้สร้าง Frontend รองรับเวอร์ชันเหล่านี้ npm มาพร้อม Node.js จึงไม่ต้องติดตั้งแยก',
+           'ติดตั้ง VS Code จาก https://code.visualstudio.com/ พร้อม extensions สำหรับ Vue, ESLint และ Git; Git จาก https://git-scm.com/downloads ใช้ตรวจสถานะไฟล์และ push source โดยไม่มี .env หรือ node_modules',
+         ],
+         bullets: ['เปิด Windows Terminal และใช้ Git Bash เมื่อต้องการรัน shell scripts', 'ตรวจ node --version, npm --version, git --version และ code --version', 'บันทึกเวอร์ชันที่ใช้เพื่อให้ทีมอื่น reproduce environment ได้'],
+-        callouts: [{ tone: 'info', title: 'ข้อกำหนดเครื่องมือ', text: 'Node.js 18 เป็น reference floor ของ workshop แต่แนะนำ current LTS; ตัวอย่างโค้ดใช้ API ที่มีใน Node.js รุ่นปัจจุบัน' }],
++        callouts: [{ tone: 'info', title: 'ข้อกำหนดเครื่องมือ', text: 'ใช้ Node.js 20.19.0 ขึ้นไปในสาย 20 หรือ 22.12.0 ขึ้นไป; Node.js 18 ไม่รองรับ Vite 7 ใน workshop นี้' }],
+       },
+       {
+         id: 'verify-node-git',
+         title: 'ตรวจสอบ Runtime และ Git ก่อนใช้งาน',
+         body: [
+-          'พิมพ์คำสั่งตรวจสอบทีละบรรทัดใน Windows Terminal ผลลัพธ์ของ node ควรขึ้นเวอร์ชัน LTS และ npm ควรเป็นเลขเวอร์ชัน หาก where node ไม่พบ executable ให้ตรวจ PATH หรือเปิด Terminal ใหม่หลังติดตั้ง',
++          'พิมพ์คำสั่งตรวจสอบทีละบรรทัดใน Windows Terminal ผลลัพธ์ของ node ควรเป็น 20.19.0 ขึ้นไปในสาย 20 หรือ 22.12.0 ขึ้นไป และ npm ควรเป็นเลขเวอร์ชัน หาก where node ไม่พบ executable ให้ตรวจ PATH หรือเปิด Terminal ใหม่หลังติดตั้ง',
+           'Git ใช้ตรวจว่าไฟล์ secrets ไม่ติดตาม และ VS Code CLI ใช้เปิด root auth-lab ได้สะดวก คำสั่งเหล่านี้ไม่แก้ไขระบบ ยกเว้นการอ่านข้อมูลเวอร์ชันและตำแหน่งโปรแกรม',
+         ],
+         snippets: [installationSnippets[0]],
+-        callouts: [{ tone: 'success', title: 'ผลลัพธ์ที่คาดหวัง', text: 'Node.js แสดง v18 ขึ้นไป (แนะนำ LTS ปัจจุบัน), npm แสดงเลขเวอร์ชัน และ Git/VS Code แสดงเวอร์ชันได้' }],
++        callouts: [{ tone: 'success', title: 'ผลลัพธ์ที่คาดหวัง', text: 'Node.js แสดง v20.19.0 ขึ้นไปในสาย 20 หรือ v22.12.0 ขึ้นไป, npm แสดงเลขเวอร์ชัน และ Git/VS Code แสดงเวอร์ชันได้' }],
+       },
+       {
+         id: 'install-mysql-heidi',
+@@ -207,7 +207,7 @@ const coreBlueprints: Record<CoreLessonId, CoreBlueprint> = {
+     ],
+     checkpoint: {
+       summary: 'ยืนยันว่ารันเครื่องมือบน Windows Terminal และเชื่อม MySQL ด้วย HeidiSQL ได้จริงก่อนเริ่มสร้าง AuthLab',
+-      checklist: ['ระบุเวอร์ชัน Node.js และยืนยันว่าตรงตาม reference floor', 'แสดงผล node --version และ npm --version ได้', 'เชื่อม MySQL/MariaDB ด้วย HeidiSQL และรัน SELECT VERSION()', 'ตรวจ charset/collation และเปิดโปรเจกต์ใน VS Code ด้วย Git ได้'],
++      checklist: ['ระบุเวอร์ชัน Node.js และยืนยันว่าเป็น 20.19.0 ขึ้นไปในสาย 20 หรือ 22.12.0 ขึ้นไป', 'แสดงผล node --version และ npm --version ได้', 'เชื่อม MySQL/MariaDB ด้วย HeidiSQL และรัน SELECT VERSION()', 'ตรวจ charset/collation และเปิดโปรเจกต์ใน VS Code ด้วย Git ได้'],
+     },
+   },
+   setup: {
+@@ -218,7 +218,7 @@ const coreBlueprints: Record<CoreLessonId, CoreBlueprint> = {
+         id: 'scaffold-project',
+         title: 'สร้าง Backend และ Vue Frontend',
+         body: [
+-          'เลือก Git Bash ใน Windows Terminal แล้วสร้าง root ชื่อ auth-lab แยก Backend/Frontend ชัดเจน Backend ใช้ npm init และ ESM ขณะที่ Frontend ใช้ npm create vite@latest auth-frontend -- --template vue-ts จากนั้นติดตั้ง Axios, Pinia และ Tailwind CSS',
++          'เลือก Git Bash ใน Windows Terminal แล้วสร้าง root ชื่อ auth-lab แยก Backend/Frontend ชัดเจน ต้องใช้ Node.js 20.19.0 ขึ้นไปในสาย 20 หรือ 22.12.0 ขึ้นไปก่อนรัน Vite 7 Backend ใช้ npm init และ ESM ขณะที่ Frontend ใช้ npm create vite@latest auth-frontend -- --template vue-ts จากนั้นติดตั้ง Axios, Pinia และ Tailwind CSS',
+           ' dependency ของ Backend ครอบคลุม Express, mysql2, bcryptjs, jsonwebtoken, cors, dotenv, express-validator, helmet และ express-rate-limit ส่วน nodemon เป็น development dependency เท่านั้น',
+         ],
+         snippets: [setupSnippets[0], setupSnippets[1]],
+diff --git a/src/data/lessons/content.test.ts b/src/data/lessons/content.test.ts
+index 6e5e527..e790841 100644
+--- a/src/data/lessons/content.test.ts
++++ b/src/data/lessons/content.test.ts
+@@ -189,6 +189,18 @@ describe('AuthLab lesson content', () => {
+     }
+   });
+ 
++  it('requires Node.js releases supported by the Vite 7 workshop toolchain', () => {
++    const installationText = lessonText(contentCourse.getLessonContent('certificate', 'installation')!);
++    const setupText = lessonText(contentCourse.getLessonContent('certificate', 'setup')!);
++    const toolCheckNote = getSnippet('installation-windows-tool-check').notes[0];
++
++    for (const text of [installationText, setupText, toolCheckNote]) {
++      expect(text).toContain('20.19.0');
++      expect(text).toContain('22.12.0');
++      expect(text).not.toMatch(/reference floor 18|Node\.js 18 เป็น|v18 ขึ้นไป/);
++    }
++  });
++
+   it('keeps the security model explicit and free of sample production secrets', () => {
+     const securityText = lessonText(contentCourse.getLessonContent('diploma', 'security')!);
+     expect(securityText).toContain('parameterized');
+diff --git a/src/data/lessons/diploma.ts b/src/data/lessons/diploma.ts
+index 3e55592..a603a34 100644
+--- a/src/data/lessons/diploma.ts
++++ b/src/data/lessons/diploma.ts
+@@ -38,9 +38,10 @@ const advancedBlueprints: Record<AdvancedLessonId, AdvancedBlueprint> = {
+         body: [
+           'Refresh route อ่าน cookie แทน JavaScript localStorage แล้ว rotate และออก access token ใหม่ HttpOnly ทำให้ XSS อ่าน cookie ไม่ได้โดยตรง แต่ token ยังถูกแนบอัตโนมัติจึงต้องป้องกัน CSRF',
+           'Secure เปิดเฉพาะ production, SameSite=Lax ไม่ส่ง cookie บน cross-site POST โดยทั่วไป และ path จำกัดไว้ที่ /api/auth สำหรับ concept นี้ cookie-parser ติดตั้งจากบท Setup แล้ว route ตรวจ Origin allowlist ก่อน state-changing request',
++          'controller ตัวอย่างเรียก issueRefreshToken หลัง Register/Login สำเร็จ และลบผู้ใช้ใหม่เมื่อการออก refresh cookie เริ่มต้นล้มเหลวเป็น compensating cleanup; production ควรใช้ transaction ร่วมระหว่าง users กับ refresh_tokens เพื่อให้ atomic',
+         ],
+-        snippets: [securitySnippets[4], securitySnippets[6]],
+-        bullets: ['Login/Register ที่ production ต้องเรียก issueRefreshToken หลังยืนยันสำเร็จ', 'Axios ที่ใช้ cookie ต้องตั้ง withCredentials และ CORS origin ให้ตรงกัน', 'Logout ต้อง revoke record และ clear cookie ด้วย options เดียวกัน', 'Browser Demo ใน AuthLab ไม่ใช่ production auth เพราะยังไม่มี flow ทั้งหมดนี้'],
++        snippets: [securitySnippets[7], securitySnippets[4], securitySnippets[6]],
++        bullets: ['Register/Login ต้องออก refresh cookie เริ่มต้นก่อนตอบ success', 'Axios ที่ใช้ cookie ต้องตั้ง withCredentials และ CORS origin ให้ตรงกัน', 'Logout ต้อง revoke record และ clear cookie ด้วย options เดียวกัน', 'Browser Demo ใน AuthLab ไม่ใช่ production auth เพราะยังไม่มี flow ทั้งหมดนี้'],
+         callouts: [{ tone: 'warning', title: 'CSRF ไม่หายจาก HttpOnly', text: 'HttpOnly ป้องกันการอ่าน token ด้วย JavaScript ไม่ได้ป้องกัน browser การส่ง cookie ให้ attacker; ตัวอย่างนี้รวม SameSite=Lax กับ Origin allowlist และยังควรเพิ่ม CSRF token เมื่อ threat model ต้องการ defense เพิ่ม' }],
+       },
+       {
+diff --git a/src/data/snippets/backend.ts b/src/data/snippets/backend.ts
+index d14caa2..e2b184c 100644
+--- a/src/data/snippets/backend.ts
++++ b/src/data/snippets/backend.ts
+@@ -83,7 +83,7 @@ export const passwordPolicyMessage =
+ 
+ export async function findByEmail(email) {
+   const [rows] = await pool.execute(
+-    'SELECT id, email, password_hash FROM users WHERE email = ? LIMIT 1',
++    'SELECT id, email, password_hash, created_at FROM users WHERE email = ? LIMIT 1',
+     [email],
+   );
+   return rows[0] ?? null;
+@@ -103,13 +103,17 @@ export async function createUser(email, passwordHash) {
+     [email, passwordHash],
+   );
+   return result.insertId;
++}
++
++export async function deleteUserById(id) {
++  await pool.execute('DELETE FROM users WHERE id = ?', [id]);
+ }`,
+     [
+       'นำเข้า pool จากโมดูล database เพื่อให้ model เป็นผู้มีหน้าที่เรียก SQL ของผู้ใช้',
+       'เว้นบรรทัดก่อนฟังก์ชันเพื่อแยก dependency ออกจากนิยามฟังก์ชัน',
+       'ประกาศฟังก์ชันค้นหาผู้ใช้จาก email สำหรับขั้นตอน Register และ Login',
+       'เปิด pool.execute ที่คืน promise และ destructure ชุดแถวจากผลลัพธ์',
+-      'ส่ง SELECT แบบ parameterized เพื่อไม่แถบ input ลงใน SQL string',
++      'ส่ง SELECT แบบ parameterized โดยเลือก identity fields, password_hash สำหรับ Login และ created_at สำหรับ response',
+       'ส่ง email เป็นค่า parameter ที่ mysql2 escape และ quote ให้อย่างปลอดภัย',
+       'ปิด pool.execute พร้อมส่ง argument ทั้ง query และค่า parameter',
+       'คืนผู้ใช้แรกหรือ null เมื่อไม่พบแถวที่ตรงกัน',
+@@ -130,8 +134,12 @@ export async function createUser(email, passwordHash) {
+       'ปิด pool.execute สำหรับ INSERT แล้วเก็บ result ไว้อ่าน insertId',
+       'อ่าน insertId ที่ MySQL สร้างจาก AUTO_INCREMENT',
+       'คืน id ของผู้ใช้ใหม่เพื่อ controller ใส่ไว้ใน JWT และ response และปิดฟังก์ชัน',
++      'เว้นบรรทัดแยกการสร้างผู้ใช้ออกจากฟังก์ชัน cleanup',
++      'ประกาศฟังก์ชันลบผู้ใช้ตาม id สำหรับชดเชยเมื่อ Register สร้างข้อมูลแล้วแต่ออก refresh token ไม่สำเร็จ',
++      'ส่ง DELETE แบบ parameterized เพื่อลบเฉพาะผู้ใช้ที่ request นี้สร้าง',
++      'foreign key จะลบ refresh records ที่ผูกกับผู้ใช้ที่ถูกลบโดยอัตโนมัติ',
+     ],
+-    'Model ไม่รับ plaintext password และไม่ส่ง hash กลับไปที่ Frontend',
++    'Model ไม่รับ plaintext password และไม่ส่ง hash กลับไปที่ Frontend; deleteUserById ใช้ cleanup เมื่อ initial refresh issuance ล้มเหลว',
+   ),
+   defineSnippet(
+     'backend-auth-validation',
+diff --git a/src/data/snippets/installation.ts b/src/data/snippets/installation.ts
+index 242e725..60579df 100644
+--- a/src/data/snippets/installation.ts
++++ b/src/data/snippets/installation.ts
+@@ -13,7 +13,7 @@ git --version
+ where git
+ code --version`,
+     [
+-      'ตรวจสอบเวอร์ชัน Node.js โดยควรใช้ LTS ที่แนะนำปัจจุบันและต้องไม่ต่ำกว่า reference floor 18',
++      'ตรวจสอบเวอร์ชัน Node.js โดยใช้ 20.19.0 ขึ้นไปในสาย 20 หรือ 22.12.0 ขึ้นไปเพื่อให้ Vite 7 รองรับ environment',
+       'ตรวจสอบว่า npm ถูกติดตั้งมาพร้อม Node.js และสามารถเรียกใช้งานจาก Terminal ได้',
+       'แสดงตำแหน่งไฟล์ executable ของ Node.js เพื่อยืนยันว่าใช้ตัวติดตั้งไม่ใช่โปรแกรมอื่น',
+       'ตรวจสอบว่า MySQL หรือ MariaDB client มีคำสั่ง mysql ใน PATH ของ Windows',
+diff --git a/src/data/snippets/security.ts b/src/data/snippets/security.ts
+index da69e45..2cb147c 100644
+--- a/src/data/snippets/security.ts
++++ b/src/data/snippets/security.ts
+@@ -431,4 +431,192 @@ export default app;`,
+     ],
+     'แทนที่ app.js เมื่อเปิดใช้ Security level; ตั้ง CLIENT_ORIGINS ให้มี origin จริงของ Frontend และ cookie-parser ติดตั้งแล้วจากบท Setup',
+   ),
++  defineSnippet(
++    'security-auth-controller',
++    'auth-backend/src/controllers/authController.js',
++    'javascript',
++    `import bcrypt from 'bcryptjs';
++import { validationResult } from 'express-validator';
++import { createUser, deleteUserById, findByEmail, findById } from '../models/userModel.js';
++import { issueRefreshToken } from '../services/refreshTokenService.js';
++import { signAccessToken } from '../utils/token.js';
++
++function publicUser(user) {
++  return { id: user.id, email: user.email, created_at: user.created_at };
++}
++
++export async function register(req, res, next) {
++  const errors = validationResult(req);
++  if (!errors.isEmpty()) {
++    return res.status(422).json({
++      status: 'error',
++      message: 'ข้อมูลที่กรอกไม่ถูกต้อง',
++      data: { errors: errors.array().map((error) => ({ field: error.path, message: error.msg })) },
++    });
++  }
++
++  const email = req.body.email.trim().toLowerCase();
++  const passwordHash = await bcrypt.hash(req.body.password, 12);
++  let createdUserId = null;
++
++  try {
++    const existing = await findByEmail(email);
++    if (existing) {
++      return res.status(409).json({ status: 'error', message: 'อีเมลนี้ถูกใช้งานแล้ว', data: null });
++    }
++    createdUserId = await createUser(email, passwordHash);
++    const user = await findById(createdUserId);
++    if (!user) {
++      throw new Error('REGISTERED_USER_NOT_FOUND');
++    }
++    const token = signAccessToken({ id: user.id });
++    await issueRefreshToken(res, user.id);
++    return res.status(201).json({
++      status: 'success',
++      message: 'สมัครสมาชิกสำเร็จ',
++      data: { token, user: publicUser(user) },
++    });
++  } catch (error) {
++    if (createdUserId !== null) {
++      try {
++        await deleteUserById(createdUserId);
++      } catch (cleanupError) {
++        console.error('ลบผู้ใช้ที่สมัครไม่สำเร็จ', { userId: createdUserId, error: cleanupError });
++      }
++    }
++    if (error.code === 'ER_DUP_ENTRY' && createdUserId === null) {
++      return res.status(409).json({ status: 'error', message: 'อีเมลนี้ถูกใช้งานแล้ว', data: null });
++    }
++    return next(error);
++  }
++}
++
++export async function login(req, res, next) {
++  const errors = validationResult(req);
++  if (!errors.isEmpty()) {
++    return res.status(422).json({ status: 'error', message: 'ข้อมูลที่กรอกไม่ถูกต้อง', data: null });
++  }
++
++  try {
++    const email = req.body.email.trim().toLowerCase();
++    const user = await findByEmail(email);
++    const validPassword = user ? await bcrypt.compare(req.body.password, user.password_hash) : false;
++
++    if (!user || !validPassword) {
++      return res.status(401).json({ status: 'error', message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง', data: null });
++    }
++
++    const token = signAccessToken({ id: user.id });
++    await issueRefreshToken(res, user.id);
++    return res.status(200).json({
++      status: 'success',
++      message: 'เข้าสู่ระบบสำเร็จ',
++      data: { token, user: publicUser(user) },
++    });
++  } catch (error) {
++    return next(error);
++  }
++}
++
++export async function me(req, res, next) {
++  const user = await findById(req.user.id);
++  if (!user) {
++    return res.status(401).json({ status: 'error', message: 'ไม่พบผู้ใช้ที่เข้าสู่ระบบ', data: null });
++  }
++  return res.status(200).json({ status: 'success', message: 'อ่านข้อมูลผู้ใช้สำเร็จ', data: { user } });
++}`,
++    [
++      'นำเข้า bcryptjs สำหรับ hash และ compare password แบบ asynchronous',
++      'นำเข้า validationResult เพื่ออ่านผลตรวจสอบ input ที่ middleware บันทึกไว้',
++      'นำเข้า model สำหรับค้นหา สร้าง และลบผู้ใช้เมื่อต้องชดเชยข้อมูล',
++      'นำเข้า issueRefreshToken เพื่อออก refresh cookie เริ่มต้นหลังยืนยันตัวตนสำเร็จ',
++      'นำเข้า signAccessToken เพื่อสร้าง access token สั้นก่อนติดตั้ง refresh cookie',
++      'เว้นบรรทัดเพื่อแยก dependency ออกจาก helper ของ controller',
++      'ประกาศ helper ที่เลือกเฉพาะ field ที่ปลอดภัยจะแสดงให้ client',
++      'คืน id, email และ created_at จริงโดยไม่รวม password_hash',
++      'ปิด helper publicUser ที่จำกัดข้อมูลผู้ใช้ใน response',
++      'เว้นบรรทัดเพื่อแยก helper ออกจาก Register handler',
++      'ส่งออก asynchronous controller สำหรับ POST /api/auth/register',
++      'รวบรวม validation errors จาก request นี้ก่อนทำงานกับ database',
++      'ตรวจว่ามี error หรือไม่ก่อนเข้าสู่กระบวนการสมัคร',
++      'ตอบ 422 เมื่อ input ผ่านรูปแบบ HTTP แต่ไม่ผ่าน business validation',
++      'กำหนด status error ให้ client แยกเส้นทางสำเร็จออกจากข้อมูลผิด',
++      'ส่ง message ภาษาไทยที่ Frontend แสดงได้',
++      'ส่ง errors แบบ field/message เพื่อให้ฟอร์ม map error กับ input ได้',
++      'ปิด object ของ response 422',
++      'ปิด if เมื่อ validation ไม่ผ่านแล้วไม่ดำเนินการต่อ',
++      'เว้นบรรทัดเพื่อแยก validation response ออกจากการเตรียม credential',
++      'normalize email เป็น lowercase และ trim เพื่อลดปัญหา duplicate',
++      'hash password ด้วย cost 12 ก่อนส่งเข้า database และไม่เก็บ plaintext',
++      'เก็บ id ที่สร้างไว้เพื่อ cleanup ได้เมื่อขั้นตอนถัดไปล้มเหลว',
++      'เว้นบรรทัดแยกการเตรียม credential ออกจากกระบวนการเขียนข้อมูล',
++      'เริ่ม try block สำหรับ database, token issuance และ cleanup errors',
++      'ค้นหาอีเมลก่อนเพื่อให้ผู้ใช้ได้รับ feedback ที่ช่วยได้',
++      'ตรวจผลค้นหาเพื่อแยกกรณีอีเมลที่ใช้แล้ว',
++      'ตอบ 409 เมื่ออีเมลมีอยู่แล้วโดยไม่สร้างผู้ใช้ซ้ำ',
++      'ปิด if ของอีเมลที่ซ้ำเพื่อไปขั้นตอนถัดไป',
++      'สร้างผู้ใช้และบันทึก id ทันทีสำหรับ compensating cleanup',
++      'อ่านแถวที่สร้างใหม่เพื่อให้ response มี created_at จริง',
++      'ตรวจว่าผู้ใช้ใหม่ยังอ่านได้หลัง INSERT',
++      'โยน error เมื่อสร้างแล้วหาไม่พบเพื่อไม่ตอบสำเร็จโดยไม่มี principal',
++      'ปิด if ของผู้ใช้ที่หายไป',
++      'ออก access token ก่อนติดตั้ง cookie เพื่อไม่ส่ง session เมื่อ JWT config ผิด',
++      'ออก refresh token เริ่มต้นและตั้ง HttpOnly cookie หลังสร้างผู้ใช้สำเร็จ',
++      'ตอบ 201 Created เพราะมี resource ผู้ใช้ใหม่ถูกสร้าง',
++      'กำหนด status success สำหรับ response การสมัคร',
++      'ส่งข้อความยืนยันการสมัครสมาชิกภาษาไทย',
++      'ส่ง access token และ public user แต่ไม่ส่ง raw refresh token ใน JSON',
++      'ปิด object ของ response สำเร็จ',
++      'เริ่ม catch เพื่อจัดการ error ที่เกิดหลัง入口 ของ Register',
++      'ตรวจว่ามีผู้ใช้ที่ request นี้สร้างและต้องชดเชยหรือไม่',
++      'เปิด try แยกสำหรับ cleanup เพื่อไม่ให้ error ต้นทางถูกปกติ',
++      'ลบผู้ใช้ที่สร้างไว้เมื่อการออก refresh token หรือขั้นตอนถัดไปล้มเหลว',
++      'จับ error ของการลบผู้ใช้แยกจาก error ต้นทาง',
++      'บันทึก userId และ cleanup error เท่านั้นโดยไม่ log password หรือ token',
++      'ปิด catch ของ cleanup',
++      'ปิด if ของผู้ใช้ที่ต้อง cleanup',
++      'ตอบ duplicate ก็ต่อเมื่อ INSERT ต้นทางล้มเหลวก่อนสร้างผู้ใช้สำเร็จ',
++      'ตอบ 409 แบบเดียวกันเมื่อ unique constraint ป้องกัน race condition',
++      'ปิด if ของ duplicate error',
++      'ส่ง error ต้นทางต่อไป global handler เมื่อไม่ใช่ duplicate',
++      'ปิด try/catch ของ Register',
++      'ปิด Register handler',
++      'เว้นบรรทัดเพื่อแยก Register และ Login handlers',
++      'ส่งออก asynchronous controller สำหรับ POST /api/auth/login',
++      'รวบรวม validation errors ของ Login ก่อนค้นหาผู้ใช้',
++      'ตรวจว่าฟอร์ม Login มี field หรือ format ที่ผิดหรือไม่',
++      'ตอบ 422 แบบสั้นเมื่อ input ไม่ถูกต้องโดยไม่เปิดเผยรายละเอียดภายใน',
++      'ปิด if เมื่อ Login ไม่ผ่าน validation',
++      'เว้นบรรทัดแยก validation ออกจากกระบวนการยืนยัน credential',
++      'เริ่ม try block สำหรับ database, password compare และ token issuance errors',
++      'อ่าน email แล้ว normalize เหมือน Register เพื่อค้นพบผู้ใช้เดียวกัน',
++      'ค้นหาผู้ใช้ด้วย parameterized query จาก model',
++      'เปรียบเทียบ password กับ bcrypt hash เฉพาะเมื่อพบผู้ใช้และ false เมื่อไม่พบ',
++      'เว้นบรรทัดแยกการยืนยัน credential ออกจากการตัดสินใจ response',
++      'รวมเงื่อนไข user ไม่พบหรือ password ผิดไว้ในทางออกเดียวกัน',
++      'ตอบ 401 ด้วย generic error เพื่อลด user enumeration',
++      'ปิด if ของ credential ที่ไม่ถูกต้อง',
++      'เว้นบรรทัดก่อนออก tokens เพื่อแยกเส้นทางล้มเหลวออกจากเส้นทางสำเร็จ',
++      'ออก access token ใหม่หลัง password ถูกยืนยันสำเร็จ',
++      'ออก refresh token ใหม่และตั้ง cookie ก่อนตอบว่าการ Login สำเร็จ',
++      'ตอบ 200 OK สำหรับ Login ที่ไม่สร้าง resource ใหม่',
++      'กำหนด status success สำหรับ response การเข้าสู่ระบบ',
++      'ส่งข้อความเข้าสู่ระบบสำเร็จให้ Frontend แสดงโดยไม่มีข้อมูลลับ',
++      'ส่ง access token และ public user ของ Login โดยไม่ส่ง raw refresh token ใน JSON',
++      'ปิด object ของ response Login สำเร็จ',
++      'เริ่ม catch เมื่อ database, credential comparison หรือ token issuance ล้มเหลว',
++      'ส่ง error ต่อไป global handler เพื่อไม่ตอบ success โดยไม่มี refresh cookie',
++      'ปิด catch ของ Login',
++      'ปิด Login handler',
++      'เว้นบรรทัดแยก Login ออกจาก protected endpoint',
++      'ส่งออก controller สำหรับ GET /api/auth/me ที่ requireAuth ป้องกันไว้',
++      'อ่านผู้ใช้จาก id ที่ JWT middleware ตรวจแล้ว ไม่รับ id จาก query string',
++      'ตรวจว่าผู้ใช้ยังมีอยู่ใน database หรือถูกถูกลบไปแล้ว',
++      'ตอบ 401 เมื่อ token ถูกต้องแต่ผู้ใช้ไม่มีใน database แล้ว',
++      'ปิด if ของผู้ใช้ที่ถูกลบ',
++      'ตอบ 200 พร้อม public user เท่านั้นเมื่อพบข้อมูล',
++      'ปิด response object และปิดฟังก์ชัน me',
++    ],
++    'แทนที่ authController.js เมื่อเปิด refresh-token flow; การลบผู้ใช้ใหม่เป็น compensating cleanup ไม่ใช่ transaction สำหรับ production ควรทำ users และ refresh_tokens แบบ atomic',
++  ),
+ ];
+diff --git a/src/index.css b/src/index.css
+index 8ca1864..d9feac3 100644
+--- a/src/index.css
++++ b/src/index.css
+@@ -1,5 +1,7 @@
+ @import "tailwindcss";
+ 
++@source not "../dist";
++
+ @theme inline {
+   --color-canvas: var(--canvas);
+   --color-surface: var(--surface);
+@@ -129,6 +131,63 @@ a {
+     0 3px 12px rgb(23 34 59 / 0.04);
+ }
+ 
++.token.comment,
++.token.prolog,
++.token.doctype,
++.token.cdata {
++  color: #94a3b8;
++}
++
++.token.punctuation {
++  color: #cbd5e1;
++}
++
++.token.keyword,
++.token.selector,
++.token.important {
++  color: #c4b5fd;
++}
++
++.token.string,
++.token.char,
++.token.attr-value,
++.token.regex {
++  color: #86efac;
++}
++
++.token.number,
++.token.boolean,
++.token.constant,
++.token.symbol {
++  color: #fdba74;
++}
++
++.token.operator,
++.token.entity,
++.token.url {
++  color: #f9a8d4;
++}
++
++.token.function,
++.token.class-name {
++  color: #93c5fd;
++}
++
++.token.property,
++.token.tag,
++.token.attr-name,
++.token.builtin {
++  color: #a5f3fc;
++}
++
++.token.deleted {
++  color: #fca5a5;
++}
++
++.token.inserted {
++  color: #bef264;
++}
++
+ @media (prefers-reduced-motion: reduce) {
+   html {
+     scroll-behavior: auto;
+diff --git a/src/data/lessons/refreshLifecycle.test.ts b/src/data/lessons/refreshLifecycle.test.ts
+new file mode 100644
+index 0000000..56f58e0
+--- /dev/null
++++ b/src/data/lessons/refreshLifecycle.test.ts
+@@ -0,0 +1,369 @@
++import crypto from 'node:crypto';
++import vm from 'node:vm';
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++import type { CodeSnippet } from '../../types/course';
++import { backendSnippets } from '../snippets/backend';
++import { securitySnippets } from '../snippets/security';
++
++interface UserRecord {
++  id: number;
++  email: string;
++  password_hash: string;
++  created_at: Date;
++}
++
++interface RefreshRecord {
++  id: number;
++  token_hash: string;
++  user_id: number;
++  expires_at: Date;
++  revoked_at: Date | null;
++}
++
++interface TestRequest {
++  body: { email: string; password: string };
++  cookies: { refresh_token?: string };
++  user?: { id: number };
++  get: (name: string) => string | undefined;
++}
++
++interface TestResponse {
++  statusCode?: number;
++  body?: unknown;
++  cookies: Array<[string, string, Record<string, unknown>]>;
++  clearedCookies: Array<[string, Record<string, unknown>]>;
++  status: (statusCode: number) => TestResponse;
++  json: (body: unknown) => TestResponse;
++  cookie: (name: string, value: string, options: Record<string, unknown>) => TestResponse;
++  clearCookie: (name: string, options: Record<string, unknown>) => TestResponse;
++}
++
++type Handler = (req: TestRequest, res: TestResponse, next: (error?: unknown) => void) => unknown;
++type LoadedModule = Record<string, unknown>;
++
++function getSnippet(snippets: CodeSnippet[], id: string) {
++  const snippet = snippets.find((item) => item.id === id);
++  expect(snippet, `missing snippet ${id}`).toBeDefined();
++  return snippet!;
++}
++
++function loadModule(source: string, bindings: Record<string, unknown>): LoadedModule {
++  const executable = source
++    .replace(/^import .*;\r?\n/gm, '')
++    .replace(/^export default .*;\r?\n?/gm, '')
++    .replace(/^export /gm, '');
++  const context = vm.createContext({
++    Buffer,
++    Date,
++    console,
++    process: { env: { NODE_ENV: 'test' } },
++    ...bindings,
++  });
++  vm.runInContext(executable, context, { timeout: 1_000 });
++  return context;
++}
++
++function createResponse(): TestResponse {
++  const response: TestResponse = {
++    cookies: [],
++    clearedCookies: [],
++    status(statusCode) {
++      response.statusCode = statusCode;
++      return response;
++    },
++    json(body) {
++      response.body = body;
++      return response;
++    },
++    cookie(name, value, options) {
++      response.cookies.push([name, value, options]);
++      return response;
++    },
++    clearCookie(name, options) {
++      response.clearedCookies.push([name, options]);
++      return response;
++    },
++  };
++  return response;
++}
++
++function createRequest(email = 'student@example.com', password = 'StudyPass1!'): TestRequest {
++  return {
++    body: { email, password },
++    cookies: {},
++    get: () => undefined,
++  };
++}
++
++function createPool() {
++  const users: UserRecord[] = [];
++  const refreshTokens: RefreshRecord[] = [];
++  let nextUserId = 1;
++  let nextRefreshId = 1;
++  let failNextRefreshInsert = false;
++  const issuanceError = new Error('refresh insert failed');
++
++  async function execute(sql: string, params: unknown[] = []) {
++    const statement = sql.replace(/\s+/g, ' ').trim();
++
++    if (statement.startsWith('SELECT id, email, password_hash')) {
++      const user = users.find((item) => item.email === params[0]);
++      return [user ? [{ ...user }] : [], []];
++    }
++
++    if (statement.startsWith('SELECT id, email, created_at FROM users')) {
++      const user = users.find((item) => item.id === params[0]);
++      return [user ? [{ id: user.id, email: user.email, created_at: user.created_at }] : [], []];
++    }
++
++    if (statement.startsWith('INSERT INTO users')) {
++      const user: UserRecord = {
++        id: nextUserId++,
++        email: String(params[0]),
++        password_hash: String(params[1]),
++        created_at: new Date(),
++      };
++      users.push(user);
++      return [{ insertId: user.id }, []];
++    }
++
++    if (statement.startsWith('DELETE FROM users')) {
++      const index = users.findIndex((item) => item.id === params[0]);
++      if (index === -1) return [{ affectedRows: 0 }, []];
++      const [user] = users.splice(index, 1);
++      for (let tokenIndex = refreshTokens.length - 1; tokenIndex >= 0; tokenIndex -= 1) {
++        if (refreshTokens[tokenIndex].user_id === user.id) refreshTokens.splice(tokenIndex, 1);
++      }
++      return [{ affectedRows: 1 }, []];
++    }
++
++    if (statement.startsWith('INSERT INTO refresh_tokens')) {
++      if (failNextRefreshInsert) {
++        failNextRefreshInsert = false;
++        throw issuanceError;
++      }
++      const record: RefreshRecord = {
++        id: nextRefreshId++,
++        token_hash: String(params[0]),
++        user_id: Number(params[1]),
++        expires_at: new Date(String(params[2])),
++        revoked_at: null,
++      };
++      refreshTokens.push(record);
++      return [{ insertId: record.id }, []];
++    }
++
++    if (statement.startsWith('SELECT id, user_id, expires_at, revoked_at FROM refresh_tokens')) {
++      const record = refreshTokens.find((item) => item.token_hash === params[0]);
++      return [record ? [{ ...record }] : [], []];
++    }
++
++    if (statement.startsWith('UPDATE refresh_tokens SET revoked_at = NOW()')) {
++      const record = refreshTokens.find((item) => (
++        typeof params[0] === 'number' ? item.id === params[0] : item.token_hash === params[0]
++      ));
++      if (!record || record.revoked_at || record.expires_at <= new Date()) {
++        return [{ affectedRows: 0 }, []];
++      }
++      record.revoked_at = new Date();
++      return [{ affectedRows: 1 }, []];
++    }
++
++    throw new Error(`Unexpected SQL: ${statement}`);
++  }
++
++  return {
++    users,
++    refreshTokens,
++    issuanceError,
++    execute,
++    failNextIssuance: () => {
++      failNextRefreshInsert = true;
++    },
++    async getConnection() {
++      return {
++        beginTransaction: async () => undefined,
++        commit: async () => undefined,
++        rollback: async () => undefined,
++        release: () => undefined,
++        execute,
++      };
++    },
++  };
++}
++
++function createHarness() {
++  const pool = createPool();
++  const model = loadModule(getSnippet(backendSnippets, 'backend-user-model').code, { pool });
++  const service = loadModule(getSnippet(securitySnippets, 'security-refresh-token-service').code, { crypto, pool });
++  const issueRefreshToken = service.issueRefreshToken as (res: TestResponse, userId: number) => Promise<void>;
++  const rotateRefreshToken = service.rotateRefreshToken as (token?: string) => Promise<number | null>;
++  const revokeRefreshToken = service.revokeRefreshToken as (token?: string) => Promise<void>;
++  const signAccessToken = (user: { id: number }) => `access:${user.id}`;
++  const controller = loadModule(getSnippet(securitySnippets, 'security-auth-controller').code, {
++    bcrypt: {
++      hash: async (value: string) => `hash:${value}`,
++      compare: async (value: string, hash: string) => hash === `hash:${value}`,
++    },
++    validationResult: () => ({ isEmpty: () => true, array: () => [] }),
++    createUser: model.createUser,
++    deleteUserById: model.deleteUserById,
++    findByEmail: model.findByEmail,
++    findById: model.findById,
++    signAccessToken,
++    issueRefreshToken,
++  });
++
++  const routes: Array<{ path: string; handlers: Handler[] }> = [];
++  const router = {
++    post(path: string, ...handlers: Handler[]) {
++      routes.push({ path, handlers });
++    },
++    get(path: string, ...handlers: Handler[]) {
++      routes.push({ path, handlers });
++    },
++  };
++  loadModule(getSnippet(backendSnippets, 'backend-auth-routes').code, {
++    Router: () => router,
++    rateLimit: () => (_req: TestRequest, _res: TestResponse, next: () => void) => next(),
++    loginValidation: [],
++    registerValidation: [],
++    requireAuth: (_req: TestRequest, _res: TestResponse, next: () => void) => next(),
++    login: controller.login,
++    me: controller.me,
++    register: controller.register,
++  });
++  loadModule(getSnippet(securitySnippets, 'security-refresh-routes').code, {
++    Router: () => router,
++    cookieParser: () => (_req: TestRequest, _res: TestResponse, next: () => void) => next(),
++    signAccessToken,
++    issueRefreshToken,
++    rotateRefreshToken,
++    revokeRefreshToken,
++  });
++
++  const handlerFor = (path: string) => {
++    const route = routes.find((item) => item.path === path);
++    expect(route, `missing route ${path}`).toBeDefined();
++    return route!.handlers.at(-1)!;
++  };
++
++  return {
++    pool,
++    register: controller.register as Handler,
++    login: controller.login as Handler,
++    me: handlerFor('/me'),
++    refresh: handlerFor('/refresh'),
++    logout: handlerFor('/logout'),
++  };
++}
++
++describe('refresh-token lifecycle shown in the security lesson', () => {
++  let harness: ReturnType<typeof createHarness>;
++
++  beforeEach(() => {
++    harness = createHarness();
++  });
++
++  it('issues the initial refresh cookie on Register and Login, then rotates and revokes it', async () => {
++    const registerResponse = createResponse();
++    const registerNext = vi.fn();
++    await harness.register(createRequest(), registerResponse, registerNext);
++
++    expect(registerNext).not.toHaveBeenCalled();
++    expect(registerResponse.statusCode).toBe(201);
++    expect(registerResponse.cookies).toHaveLength(1);
++    const registerToken = registerResponse.cookies[0][1];
++    expect(registerResponse.cookies[0][2]).toMatchObject({ httpOnly: true, sameSite: 'lax', path: '/api/auth' });
++    expect(registerResponse.body).toMatchObject({
++      status: 'success',
++      data: { token: 'access:1', user: { id: 1, email: 'student@example.com', created_at: expect.any(Date) } },
++    });
++    expect(harness.pool.refreshTokens[0].token_hash).toBe(crypto.createHash('sha256').update(registerToken).digest('hex'));
++    expect(harness.pool.refreshTokens[0].token_hash).not.toBe(registerToken);
++
++    const loginResponse = createResponse();
++    const loginNext = vi.fn();
++    await harness.login(createRequest(), loginResponse, loginNext);
++
++    expect(loginNext).not.toHaveBeenCalled();
++    expect(loginResponse.statusCode).toBe(200);
++    expect(loginResponse.cookies).toHaveLength(1);
++    expect(harness.pool.refreshTokens).toHaveLength(2);
++
++    const refreshResponse = createResponse();
++    const refreshRequest = createRequest();
++    refreshRequest.cookies.refresh_token = registerToken;
++    await harness.refresh(refreshRequest, refreshResponse, vi.fn());
++
++    expect(refreshResponse.statusCode).toBe(200);
++    expect(refreshResponse.body).toMatchObject({ status: 'success', data: { token: 'access:1' } });
++    expect(refreshResponse.cookies).toHaveLength(1);
++    const rotatedToken = refreshResponse.cookies[0][1];
++    expect(rotatedToken).not.toBe(registerToken);
++    expect(harness.pool.refreshTokens[0].revoked_at).toBeInstanceOf(Date);
++    expect(harness.pool.refreshTokens).toHaveLength(3);
++
++    const reuseResponse = createResponse();
++    const reuseRequest = createRequest();
++    reuseRequest.cookies.refresh_token = registerToken;
++    await harness.refresh(reuseRequest, reuseResponse, vi.fn());
++
++    expect(reuseResponse.statusCode).toBe(401);
++    expect(reuseResponse.clearedCookies).toHaveLength(1);
++
++    const logoutResponse = createResponse();
++    const logoutRequest = createRequest();
++    logoutRequest.cookies.refresh_token = rotatedToken;
++    await harness.logout(logoutRequest, logoutResponse, vi.fn());
++
++    expect(logoutResponse.statusCode).toBe(200);
++    expect(logoutResponse.clearedCookies).toHaveLength(1);
++    expect(harness.pool.refreshTokens.find((item) => item.token_hash === crypto.createHash('sha256').update(rotatedToken).digest('hex'))?.revoked_at).toBeInstanceOf(Date);
++  });
++
++  it('keeps the existing protected /me route linked to the advanced controller', async () => {
++    await harness.register(createRequest(), createResponse(), vi.fn());
++    const request = createRequest();
++    request.user = { id: 1 };
++    const response = createResponse();
++    const next = vi.fn();
++
++    await harness.me(request, response, next);
++
++    expect(next).not.toHaveBeenCalled();
++    expect(response.statusCode).toBe(200);
++    expect(response.body).toMatchObject({
++      status: 'success',
++      data: { user: { id: 1, email: 'student@example.com', created_at: expect.any(Date) } },
++    });
++    expect(JSON.stringify(response.body)).not.toContain('hash:StudyPass1!');
++  });
++
++  it('removes a newly registered user when initial refresh issuance fails', async () => {
++    harness.pool.failNextIssuance();
++    const response = createResponse();
++    const next = vi.fn();
++
++    await harness.register(createRequest(), response, next);
++
++    expect(next).toHaveBeenCalledWith(harness.pool.issuanceError);
++    expect(response.statusCode).toBeUndefined();
++    expect(response.cookies).toHaveLength(0);
++    expect(harness.pool.users).toHaveLength(0);
++  });
++
++  it('forwards Login issuance failures without deleting the existing user', async () => {
++    await harness.pool.execute('INSERT INTO users (email, password_hash) VALUES (?, ?)', ['student@example.com', 'hash:StudyPass1!']);
++    harness.pool.failNextIssuance();
++    const response = createResponse();
++    const next = vi.fn();
++
++    await harness.login(createRequest(), response, next);
++
++    expect(next).toHaveBeenCalledWith(harness.pool.issuanceError);
++    expect(response.statusCode).toBeUndefined();
++    expect(response.cookies).toHaveLength(0);
++    expect(harness.pool.users).toHaveLength(1);
++  });
++});

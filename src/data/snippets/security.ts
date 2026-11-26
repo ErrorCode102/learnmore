@@ -431,4 +431,192 @@ export default app;`,
     ],
     'แทนที่ app.js เมื่อเปิดใช้ Security level; ตั้ง CLIENT_ORIGINS ให้มี origin จริงของ Frontend และ cookie-parser ติดตั้งแล้วจากบท Setup',
   ),
+  defineSnippet(
+    'security-auth-controller',
+    'auth-backend/src/controllers/authController.js',
+    'javascript',
+    `import bcrypt from 'bcryptjs';
+import { validationResult } from 'express-validator';
+import { createUser, deleteUserById, findByEmail, findById } from '../models/userModel.js';
+import { issueRefreshToken } from '../services/refreshTokenService.js';
+import { signAccessToken } from '../utils/token.js';
+
+function publicUser(user) {
+  return { id: user.id, email: user.email, created_at: user.created_at };
+}
+
+export async function register(req, res, next) {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(422).json({
+      status: 'error',
+      message: 'ข้อมูลที่กรอกไม่ถูกต้อง',
+      data: { errors: errors.array().map((error) => ({ field: error.path, message: error.msg })) },
+    });
+  }
+
+  const email = req.body.email.trim().toLowerCase();
+  const passwordHash = await bcrypt.hash(req.body.password, 12);
+  let createdUserId = null;
+
+  try {
+    const existing = await findByEmail(email);
+    if (existing) {
+      return res.status(409).json({ status: 'error', message: 'อีเมลนี้ถูกใช้งานแล้ว', data: null });
+    }
+    createdUserId = await createUser(email, passwordHash);
+    const user = await findById(createdUserId);
+    if (!user) {
+      throw new Error('REGISTERED_USER_NOT_FOUND');
+    }
+    const token = signAccessToken({ id: user.id });
+    await issueRefreshToken(res, user.id);
+    return res.status(201).json({
+      status: 'success',
+      message: 'สมัครสมาชิกสำเร็จ',
+      data: { token, user: publicUser(user) },
+    });
+  } catch (error) {
+    if (createdUserId !== null) {
+      try {
+        await deleteUserById(createdUserId);
+      } catch (cleanupError) {
+        console.error('ลบผู้ใช้ที่สมัครไม่สำเร็จ', { userId: createdUserId, error: cleanupError });
+      }
+    }
+    if (error.code === 'ER_DUP_ENTRY' && createdUserId === null) {
+      return res.status(409).json({ status: 'error', message: 'อีเมลนี้ถูกใช้งานแล้ว', data: null });
+    }
+    return next(error);
+  }
+}
+
+export async function login(req, res, next) {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(422).json({ status: 'error', message: 'ข้อมูลที่กรอกไม่ถูกต้อง', data: null });
+  }
+
+  try {
+    const email = req.body.email.trim().toLowerCase();
+    const user = await findByEmail(email);
+    const validPassword = user ? await bcrypt.compare(req.body.password, user.password_hash) : false;
+
+    if (!user || !validPassword) {
+      return res.status(401).json({ status: 'error', message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง', data: null });
+    }
+
+    const token = signAccessToken({ id: user.id });
+    await issueRefreshToken(res, user.id);
+    return res.status(200).json({
+      status: 'success',
+      message: 'เข้าสู่ระบบสำเร็จ',
+      data: { token, user: publicUser(user) },
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function me(req, res, next) {
+  const user = await findById(req.user.id);
+  if (!user) {
+    return res.status(401).json({ status: 'error', message: 'ไม่พบผู้ใช้ที่เข้าสู่ระบบ', data: null });
+  }
+  return res.status(200).json({ status: 'success', message: 'อ่านข้อมูลผู้ใช้สำเร็จ', data: { user } });
+}`,
+    [
+      'นำเข้า bcryptjs สำหรับ hash และ compare password แบบ asynchronous',
+      'นำเข้า validationResult เพื่ออ่านผลตรวจสอบ input ที่ middleware บันทึกไว้',
+      'นำเข้า model สำหรับค้นหา สร้าง และลบผู้ใช้เมื่อต้องชดเชยข้อมูล',
+      'นำเข้า issueRefreshToken เพื่อออก refresh cookie เริ่มต้นหลังยืนยันตัวตนสำเร็จ',
+      'นำเข้า signAccessToken เพื่อสร้าง access token สั้นก่อนติดตั้ง refresh cookie',
+      'เว้นบรรทัดเพื่อแยก dependency ออกจาก helper ของ controller',
+      'ประกาศ helper ที่เลือกเฉพาะ field ที่ปลอดภัยจะแสดงให้ client',
+      'คืน id, email และ created_at จริงโดยไม่รวม password_hash',
+      'ปิด helper publicUser ที่จำกัดข้อมูลผู้ใช้ใน response',
+      'เว้นบรรทัดเพื่อแยก helper ออกจาก Register handler',
+      'ส่งออก asynchronous controller สำหรับ POST /api/auth/register',
+      'รวบรวม validation errors จาก request นี้ก่อนทำงานกับ database',
+      'ตรวจว่ามี error หรือไม่ก่อนเข้าสู่กระบวนการสมัคร',
+      'ตอบ 422 เมื่อ input ผ่านรูปแบบ HTTP แต่ไม่ผ่าน business validation',
+      'กำหนด status error ให้ client แยกเส้นทางสำเร็จออกจากข้อมูลผิด',
+      'ส่ง message ภาษาไทยที่ Frontend แสดงได้',
+      'ส่ง errors แบบ field/message เพื่อให้ฟอร์ม map error กับ input ได้',
+      'ปิด object ของ response 422',
+      'ปิด if เมื่อ validation ไม่ผ่านแล้วไม่ดำเนินการต่อ',
+      'เว้นบรรทัดเพื่อแยก validation response ออกจากการเตรียม credential',
+      'normalize email เป็น lowercase และ trim เพื่อลดปัญหา duplicate',
+      'hash password ด้วย cost 12 ก่อนส่งเข้า database และไม่เก็บ plaintext',
+      'เก็บ id ที่สร้างไว้เพื่อ cleanup ได้เมื่อขั้นตอนถัดไปล้มเหลว',
+      'เว้นบรรทัดแยกการเตรียม credential ออกจากกระบวนการเขียนข้อมูล',
+      'เริ่ม try block สำหรับ database, token issuance และ cleanup errors',
+      'ค้นหาอีเมลก่อนเพื่อให้ผู้ใช้ได้รับ feedback ที่ช่วยได้',
+      'ตรวจผลค้นหาเพื่อแยกกรณีอีเมลที่ใช้แล้ว',
+      'ตอบ 409 เมื่ออีเมลมีอยู่แล้วโดยไม่สร้างผู้ใช้ซ้ำ',
+      'ปิด if ของอีเมลที่ซ้ำเพื่อไปขั้นตอนถัดไป',
+      'สร้างผู้ใช้และบันทึก id ทันทีสำหรับ compensating cleanup',
+      'อ่านแถวที่สร้างใหม่เพื่อให้ response มี created_at จริง',
+      'ตรวจว่าผู้ใช้ใหม่ยังอ่านได้หลัง INSERT',
+      'โยน error เมื่อสร้างแล้วหาไม่พบเพื่อไม่ตอบสำเร็จโดยไม่มี principal',
+      'ปิด if ของผู้ใช้ที่หายไป',
+      'ออก access token ก่อนติดตั้ง cookie เพื่อไม่ส่ง session เมื่อ JWT config ผิด',
+      'ออก refresh token เริ่มต้นและตั้ง HttpOnly cookie หลังสร้างผู้ใช้สำเร็จ',
+      'ตอบ 201 Created เพราะมี resource ผู้ใช้ใหม่ถูกสร้าง',
+      'กำหนด status success สำหรับ response การสมัคร',
+      'ส่งข้อความยืนยันการสมัครสมาชิกภาษาไทย',
+      'ส่ง access token และ public user แต่ไม่ส่ง raw refresh token ใน JSON',
+      'ปิด object ของ response สำเร็จ',
+      'เริ่ม catch เพื่อจัดการ error ที่เกิดหลัง入口 ของ Register',
+      'ตรวจว่ามีผู้ใช้ที่ request นี้สร้างและต้องชดเชยหรือไม่',
+      'เปิด try แยกสำหรับ cleanup เพื่อไม่ให้ error ต้นทางถูกปกติ',
+      'ลบผู้ใช้ที่สร้างไว้เมื่อการออก refresh token หรือขั้นตอนถัดไปล้มเหลว',
+      'จับ error ของการลบผู้ใช้แยกจาก error ต้นทาง',
+      'บันทึก userId และ cleanup error เท่านั้นโดยไม่ log password หรือ token',
+      'ปิด catch ของ cleanup',
+      'ปิด if ของผู้ใช้ที่ต้อง cleanup',
+      'ตอบ duplicate ก็ต่อเมื่อ INSERT ต้นทางล้มเหลวก่อนสร้างผู้ใช้สำเร็จ',
+      'ตอบ 409 แบบเดียวกันเมื่อ unique constraint ป้องกัน race condition',
+      'ปิด if ของ duplicate error',
+      'ส่ง error ต้นทางต่อไป global handler เมื่อไม่ใช่ duplicate',
+      'ปิด try/catch ของ Register',
+      'ปิด Register handler',
+      'เว้นบรรทัดเพื่อแยก Register และ Login handlers',
+      'ส่งออก asynchronous controller สำหรับ POST /api/auth/login',
+      'รวบรวม validation errors ของ Login ก่อนค้นหาผู้ใช้',
+      'ตรวจว่าฟอร์ม Login มี field หรือ format ที่ผิดหรือไม่',
+      'ตอบ 422 แบบสั้นเมื่อ input ไม่ถูกต้องโดยไม่เปิดเผยรายละเอียดภายใน',
+      'ปิด if เมื่อ Login ไม่ผ่าน validation',
+      'เว้นบรรทัดแยก validation ออกจากกระบวนการยืนยัน credential',
+      'เริ่ม try block สำหรับ database, password compare และ token issuance errors',
+      'อ่าน email แล้ว normalize เหมือน Register เพื่อค้นพบผู้ใช้เดียวกัน',
+      'ค้นหาผู้ใช้ด้วย parameterized query จาก model',
+      'เปรียบเทียบ password กับ bcrypt hash เฉพาะเมื่อพบผู้ใช้และ false เมื่อไม่พบ',
+      'เว้นบรรทัดแยกการยืนยัน credential ออกจากการตัดสินใจ response',
+      'รวมเงื่อนไข user ไม่พบหรือ password ผิดไว้ในทางออกเดียวกัน',
+      'ตอบ 401 ด้วย generic error เพื่อลด user enumeration',
+      'ปิด if ของ credential ที่ไม่ถูกต้อง',
+      'เว้นบรรทัดก่อนออก tokens เพื่อแยกเส้นทางล้มเหลวออกจากเส้นทางสำเร็จ',
+      'ออก access token ใหม่หลัง password ถูกยืนยันสำเร็จ',
+      'ออก refresh token ใหม่และตั้ง cookie ก่อนตอบว่าการ Login สำเร็จ',
+      'ตอบ 200 OK สำหรับ Login ที่ไม่สร้าง resource ใหม่',
+      'กำหนด status success สำหรับ response การเข้าสู่ระบบ',
+      'ส่งข้อความเข้าสู่ระบบสำเร็จให้ Frontend แสดงโดยไม่มีข้อมูลลับ',
+      'ส่ง access token และ public user ของ Login โดยไม่ส่ง raw refresh token ใน JSON',
+      'ปิด object ของ response Login สำเร็จ',
+      'เริ่ม catch เมื่อ database, credential comparison หรือ token issuance ล้มเหลว',
+      'ส่ง error ต่อไป global handler เพื่อไม่ตอบ success โดยไม่มี refresh cookie',
+      'ปิด catch ของ Login',
+      'ปิด Login handler',
+      'เว้นบรรทัดแยก Login ออกจาก protected endpoint',
+      'ส่งออก controller สำหรับ GET /api/auth/me ที่ requireAuth ป้องกันไว้',
+      'อ่านผู้ใช้จาก id ที่ JWT middleware ตรวจแล้ว ไม่รับ id จาก query string',
+      'ตรวจว่าผู้ใช้ยังมีอยู่ใน database หรือถูกถูกลบไปแล้ว',
+      'ตอบ 401 เมื่อ token ถูกต้องแต่ผู้ใช้ไม่มีใน database แล้ว',
+      'ปิด if ของผู้ใช้ที่ถูกลบ',
+      'ตอบ 200 พร้อม public user เท่านั้นเมื่อพบข้อมูล',
+      'ปิด response object และปิดฟังก์ชัน me',
+    ],
+    'แทนที่ authController.js เมื่อเปิด refresh-token flow; การลบผู้ใช้ใหม่เป็น compensating cleanup ไม่ใช่ transaction สำหรับ production ควรทำ users และ refresh_tokens แบบ atomic',
+  ),
 ];

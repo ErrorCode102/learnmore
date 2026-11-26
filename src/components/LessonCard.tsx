@@ -23,6 +23,7 @@ export function LessonCard({ lesson, completed }: LessonCardProps) {
 
       <Link
         to={`/lesson/${lesson.id}`}
+        aria-label={`เปิดบทเรียน ${lesson.title}`}
         className="group block rounded-2xl border border-line bg-surface p-5 shadow-[0_12px_35px_-30px_rgba(23,34,59,0.55)] transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-brand/35 hover:shadow-[0_18px_40px_-30px_rgba(79,70,229,0.45)] sm:p-6"
       >
         <article>

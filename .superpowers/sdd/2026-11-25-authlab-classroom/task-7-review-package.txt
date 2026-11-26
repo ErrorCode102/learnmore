@@ -1,0 +1,592 @@
+diff --git a/index.html b/index.html
+index 6a08fb2..d5d675f 100644
+--- a/index.html
++++ b/index.html
+@@ -1,18 +1,19 @@
+ <!doctype html>
+ <html lang="th">
+   <head>
+     <meta charset="UTF-8" />
+     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+     <meta name="theme-color" content="#f5f3ed" />
++    <link rel="icon" href="/favicon.svg" />
+     <meta
+       name="description"
+       content="AuthLab ห้องเรียน Authentication ภาษาไทยสำหรับนักศึกษา ปวช. และ ปวส."
+     />
+     <title>AuthLab — ห้องเรียน Authentication</title>
+     <script id="theme-bootstrap">
+       (function () {
+         var key = 'auth-classroom:theme:v1';
+         var preference = 'system';
+         try {
+           var stored = localStorage.getItem(key);
+           if (stored === 'light' || stored === 'dark' || stored === 'system') {
+diff --git a/src/components/LessonCard.tsx b/src/components/LessonCard.tsx
+index b8fbed0..291a0ff 100644
+--- a/src/components/LessonCard.tsx
++++ b/src/components/LessonCard.tsx
+@@ -14,24 +14,25 @@ export function LessonCard({ lesson, completed }: LessonCardProps) {
+         aria-hidden="true"
+         className={`absolute left-0 top-6 z-10 flex h-10 w-10 items-center justify-center rounded-full border-4 border-canvas font-mono text-xs font-semibold shadow-sm sm:h-11 sm:w-11 ${
+           completed
+             ? 'bg-brand-solid text-on-inverse'
+             : 'bg-surface text-brand'
+         }`}
+       >
+         {completed ? <Check className="h-4 w-4" strokeWidth={2.5} /> : String(lesson.order).padStart(2, '0')}
+       </span>
+ 
+       <Link
+         to={`/lesson/${lesson.id}`}
++        aria-label={`เปิดบทเรียน ${lesson.title}`}
+         className="group block rounded-2xl border border-line bg-surface p-5 shadow-[0_12px_35px_-30px_rgba(23,34,59,0.55)] transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-brand/35 hover:shadow-[0_18px_40px_-30px_rgba(79,70,229,0.45)] sm:p-6"
+       >
+         <article>
+           <div className="flex flex-wrap items-center justify-between gap-3">
+             <p className="font-mono text-[11px] font-semibold tracking-[0.12em] text-brand">
+               บทที่ {String(lesson.order).padStart(2, '0')}
+             </p>
+             <span
+               className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                 completed ? 'bg-soft-brand text-brand' : 'bg-canvas text-muted'
+               }`}
+             >
+diff --git a/src/pages/DemoPage.test.tsx b/src/pages/DemoPage.test.tsx
+index eeea170..3b71596 100644
+--- a/src/pages/DemoPage.test.tsx
++++ b/src/pages/DemoPage.test.tsx
+@@ -1,15 +1,15 @@
+ /// <reference types="node" />
+ import { webcrypto } from 'node:crypto';
+-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
++import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+ import { renderApp } from '../App';
+ import themeCss from '../index.css?raw';
+ import { logout, registerUser, resetDemoData } from '../lib/authDemo';
+ 
+ const USERS_KEY = 'auth-classroom:demo-users:v1';
+ const SESSION_KEY = 'auth-classroom:demo-session:v1';
+ const account = {
+   name: 'นักศึกษา AuthLab',
+   email: 'student@example.com',
+   password: 'StudyPass1!',
+ };
+@@ -36,25 +36,24 @@ function fillRegistration() {
+ 
+ function fillLogin(password = account.password) {
+   fireEvent.change(screen.getByLabelText('อีเมล'), { target: { value: account.email } });
+   fireEvent.change(screen.getByLabelText('รหัสผ่าน'), { target: { value: password } });
+ }
+ 
+ beforeEach(() => {
+   vi.stubGlobal('crypto', webcrypto);
+   window.localStorage.clear();
+   window.sessionStorage.clear();
+   originalLocks = Object.getOwnPropertyDescriptor(navigator, 'locks');
+   installWebLocks();
+-  vi.spyOn(window, 'confirm').mockReturnValue(true);
+ });
+ 
+ afterEach(() => {
+   vi.unstubAllGlobals();
+   if (originalLocks) {
+     Object.defineProperty(navigator, 'locks', originalLocks);
+   } else {
+     Reflect.deleteProperty(navigator, 'locks');
+   }
+ });
+ 
+ describe('Authentication Demo page', () => {
+@@ -167,59 +166,67 @@ describe('Authentication Demo page', () => {
+     );
+     expect(screen.getByRole('heading', { name: 'ทดลองใช้งานสำเร็จ' })).toBeVisible();
+     expect(window.sessionStorage.getItem(SESSION_KEY)).not.toBeNull();
+   });
+ 
+   it('requires confirmation before clearing demo users and session', async () => {
+     await registerUser(account);
+     renderDemo();
+     expect(await screen.findByRole('heading', { name: 'ทดลองใช้งานสำเร็จ' })).toBeVisible();
+ 
+     fireEvent.click(screen.getByRole('button', { name: 'ล้างข้อมูล Demo' }));
+ 
+-    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('ลบผู้ใช้ทดสอบทั้งหมด'));
++    const dialog = screen.getByRole('alertdialog', { name: 'ยืนยันการล้างข้อมูล Demo' });
++    fireEvent.click(
++      within(dialog).getByRole('button', { name: 'ยืนยันการล้างข้อมูล' }),
++    );
+     await waitFor(() => expect(screen.queryByRole('heading', { name: 'ทดลองใช้งานสำเร็จ' })).not.toBeInTheDocument());
+     expect(window.localStorage.getItem(USERS_KEY)).toBeNull();
+     expect(window.sessionStorage.getItem(SESSION_KEY)).toBeNull();
+     expect(resetDemoData()).toBeUndefined();
+   });
+ 
+   it('keeps cancelled reset data intact', async () => {
+     await registerUser(account);
+-    vi.mocked(window.confirm).mockReturnValue(false);
+     renderDemo();
+     await screen.findByRole('heading', { name: 'ทดลองใช้งานสำเร็จ' });
+ 
+     fireEvent.click(screen.getByRole('button', { name: 'ล้างข้อมูล Demo' }));
++    const dialog = screen.getByRole('alertdialog', { name: 'ยืนยันการล้างข้อมูล Demo' });
++    fireEvent.click(within(dialog).getByRole('button', { name: 'ยกเลิกการล้างข้อมูล' }));
+ 
+     expect(window.localStorage.getItem(USERS_KEY)).not.toBeNull();
+     expect(screen.getByRole('heading', { name: 'ทดลองใช้งานสำเร็จ' })).toBeVisible();
+   });
+ 
+   it('reports reset failure without claiming the stored account was deleted', async () => {
+     await registerUser(account);
+     renderDemo();
+     await screen.findByRole('heading', { name: 'ทดลองใช้งานสำเร็จ' });
+     const removeItem = Storage.prototype.removeItem;
+     vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(function (
+       this: Storage,
+       key: string,
+     ) {
+       if (this === window.localStorage) {
+         throw new DOMException('Storage blocked', 'SecurityError');
+       }
+       removeItem.call(this, key);
+     });
+ 
+     fireEvent.click(screen.getByRole('button', { name: 'ล้างข้อมูล Demo' }));
++    const dialog = screen.getByRole('alertdialog', { name: 'ยืนยันการล้างข้อมูล Demo' });
++    fireEvent.click(
++      within(dialog).getByRole('button', { name: 'ยืนยันการล้างข้อมูล' }),
++    );
+ 
+     expect(await screen.findByRole('alert')).toHaveTextContent(
+       'ไม่สามารถล้างข้อมูล Demo ในเบราว์เซอร์นี้ได้',
+     );
+     expect(window.localStorage.getItem(USERS_KEY)).not.toBeNull();
+     expect(window.sessionStorage.getItem(SESSION_KEY)).toBeNull();
+     expect(screen.queryByRole('heading', { name: 'ทดลองใช้งานสำเร็จ' })).not.toBeInTheDocument();
+     expect(screen.getByRole('button', { name: 'สร้างบัญชี Demo' })).toBeVisible();
+     expect(screen.queryByText('ล้างข้อมูล Demo แล้ว พร้อมเริ่มทดลองใหม่')).not.toBeInTheDocument();
+   });
+ 
+   it('restores a valid session when the page is reopened', async () => {
+diff --git a/src/pages/DemoPage.tsx b/src/pages/DemoPage.tsx
+index 8620463..0563cb0 100644
+--- a/src/pages/DemoPage.tsx
++++ b/src/pages/DemoPage.tsx
+@@ -1,13 +1,13 @@
+-import { useState, type FormEvent } from 'react';
++import { useEffect, useRef, useState, type FormEvent, type SyntheticEvent } from 'react';
+ import {
+   ArrowRight,
+   CircleAlert,
+   Database,
+   KeyRound,
+   LogOut,
+   RotateCcw,
+   ShieldCheck,
+   Trash2,
+   UserRound,
+ } from 'lucide-react';
+ import { PasswordChecklist } from '../components/PasswordChecklist';
+@@ -25,24 +25,43 @@ type DemoMode = 'register' | 'login';
+ const inputClassName =
+   'mt-2 min-h-12 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink outline-none transition-colors placeholder:text-muted focus:border-brand';
+ 
+ export function DemoPage() {
+   const [mode, setMode] = useState<DemoMode>('register');
+   const [name, setName] = useState('');
+   const [email, setEmail] = useState('');
+   const [password, setPassword] = useState('');
+   const [busy, setBusy] = useState(false);
+   const [error, setError] = useState('');
+   const [success, setSuccess] = useState('');
+   const [session, setSession] = useState<DemoSession | null>(() => readSession());
++  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
++  const resetDialogRef = useRef<HTMLDialogElement>(null);
++  const resetTriggerRef = useRef<HTMLButtonElement>(null);
++  const resetCancelRef = useRef<HTMLButtonElement>(null);
++
++  useEffect(() => {
++    const dialog = resetDialogRef.current;
++    if (!dialog) {
++      return;
++    }
++
++    if (isResetDialogOpen) {
++      dialog.showModal();
++      resetCancelRef.current?.focus();
++    } else if (dialog.open) {
++      dialog.close();
++      resetTriggerRef.current?.focus();
++    }
++  }, [isResetDialogOpen]);
+ 
+   function switchMode(nextMode: DemoMode) {
+     setMode(nextMode);
+     setPassword('');
+     setError('');
+     setSuccess('');
+   }
+ 
+   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+     event.preventDefault();
+     if (busy) {
+       return;
+@@ -73,31 +92,35 @@ export function DemoPage() {
+       logout();
+     } catch (caught) {
+       setError(caught instanceof Error ? caught.message : 'ไม่สามารถออกจากระบบได้');
+       return;
+     }
+ 
+     setSession(null);
+     setPassword('');
+     switchMode('login');
+     setSuccess('ออกจากระบบแล้ว ผู้ใช้ Demo ยังคงอยู่สำหรับการเข้าสู่ระบบครั้งถัดไป');
+   }
+ 
+-  function handleReset() {
+-    const confirmed = window.confirm(
+-      'ลบผู้ใช้ทดสอบทั้งหมดและ session ปัจจุบันจากเบราว์เซอร์นี้หรือไม่?',
+-    );
+-    if (!confirmed) {
+-      return;
+-    }
++  function closeResetDialog() {
++    setIsResetDialogOpen(false);
++  }
++
++  function handleResetCancel(event: SyntheticEvent<HTMLDialogElement>) {
++    event.preventDefault();
++    closeResetDialog();
++  }
++
++  function confirmReset() {
++    closeResetDialog();
+ 
+     try {
+       resetDemoData();
+     } catch (caught) {
+       setSession(readSession());
+       setError(caught instanceof Error ? caught.message : 'ไม่สามารถล้างข้อมูล Demo ได้');
+       return;
+     }
+ 
+     setSession(null);
+     setName('');
+     setEmail('');
+@@ -161,26 +184,27 @@ export function DemoPage() {
+               </div>
+             </dl>
+             <div className="flex flex-col gap-3 sm:flex-row">
+               <button
+                 type="button"
+                 onClick={handleLogout}
+                 className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-inverse px-5 py-3 text-sm font-semibold text-on-inverse transition-colors hover:bg-brand-solid-hover"
+               >
+                 <LogOut aria-hidden="true" className="h-4 w-4" />
+                 ออกจากระบบ
+               </button>
+               <button
++                ref={resetTriggerRef}
+                 type="button"
+-                onClick={handleReset}
++                onClick={() => setIsResetDialogOpen(true)}
+                 className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-line bg-surface px-5 py-3 text-sm font-semibold text-ink transition-colors hover:border-coral/40 hover:text-coral"
+               >
+                 <Trash2 aria-hidden="true" className="h-4 w-4" />
+                 ล้างข้อมูล Demo
+               </button>
+             </div>
+           </div>
+           {error && (
+             <div role="alert" className="flex items-start gap-2 border-t border-coral/25 bg-soft-coral px-6 py-4 text-sm text-danger sm:px-8">
+               <CircleAlert aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
+               <span>{error}</span>
+             </div>
+@@ -333,15 +357,51 @@ export function DemoPage() {
+                 <div>
+                   <h2 className="text-sm font-semibold">ข้อมูลจะอยู่ที่ไหน?</h2>
+                   <p className="mt-1.5 text-xs leading-6 text-muted">
+                     ผู้ใช้ Demo อยู่ใน localStorage จึงกลับมาเข้าสู่ระบบได้ ส่วน session อยู่ใน
+                     sessionStorage ดังนั้นการปิด tab จะออกจากระบบ แต่ผู้ใช้ยังอยู่
+                   </p>
+                 </div>
+               </div>
+             </section>
+           </aside>
+         </div>
+       )}
++
++      <dialog
++        ref={resetDialogRef}
++        role="alertdialog"
++        aria-modal="true"
++        aria-labelledby="reset-demo-title"
++        aria-describedby="reset-demo-description"
++        onCancel={handleResetCancel}
++        className="m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl border border-line bg-surface p-0 text-ink shadow-2xl backdrop:bg-inverse/60"
++      >
++        <div className="p-6 sm:p-7">
++          <h2 id="reset-demo-title" className="text-xl font-semibold tracking-[-0.025em]">
++            ยืนยันการล้างข้อมูล Demo
++          </h2>
++          <p id="reset-demo-description" className="mt-3 text-sm leading-7 text-muted">
++            ลบผู้ใช้ทดสอบทั้งหมดและ session ปัจจุบันจากเบราว์เซอร์นี้หรือไม่?
++          </p>
++          <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
++            <button
++              ref={resetCancelRef}
++              type="button"
++              onClick={closeResetDialog}
++              className="inline-flex min-h-12 items-center justify-center rounded-xl border border-line bg-surface px-5 py-3 text-sm font-semibold text-ink transition-colors hover:bg-canvas"
++            >
++              ยกเลิกการล้างข้อมูล
++            </button>
++            <button
++              type="button"
++              onClick={confirmReset}
++              className="inline-flex min-h-12 items-center justify-center rounded-xl bg-danger px-5 py-3 text-sm font-semibold text-surface transition-opacity hover:opacity-90"
++            >
++              ยืนยันการล้างข้อมูล
++            </button>
++          </div>
++        </div>
++      </dialog>
+     </div>
+   );
+ }
+diff --git a/src/test/accessibility.test.tsx b/src/test/accessibility.test.tsx
+new file mode 100644
+index 0000000..36882b2
+--- /dev/null
++++ b/src/test/accessibility.test.tsx
+@@ -0,0 +1,162 @@
++import { fireEvent, render, screen, within } from '@testing-library/react';
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++import { renderApp } from '../App';
++import { CodeExplorer } from '../components/CodeExplorer';
++import { getLessonsForLevel } from '../data/course';
++import {
++  DEMO_SESSION_KEY,
++  DEMO_USERS_KEY,
++  type DemoUser,
++} from '../lib/authDemo';
++import type { CodeSnippet } from '../types/course';
++
++const demoUser: DemoUser = {
++  id: 'demo-user-1',
++  name: 'นักศึกษา AuthLab',
++  email: 'student@example.com',
++  salt: 'test-salt',
++  passwordHash: 'test-hash',
++  createdAt: '2026-11-26T00:00:00.000Z',
++};
++
++const snippet: CodeSnippet = {
++  id: 'accessibility-example',
++  filename: 'server.js',
++  language: 'javascript',
++  code: 'app.get("/health", (req, res) => {\n\n  res.json({ ok: true });\n});',
++  notes: [
++    'สร้างเส้นทาง GET สำหรับตรวจสอบสถานะ server',
++    'เว้นบรรทัดก่อนการตอบกลับเพื่อแยกส่วนการทำงาน',
++    'ส่งสถานะสำเร็จกลับเป็น JSON',
++    'ปิด callback และคำสั่งสร้างเส้นทาง',
++  ],
++};
++
++function renderDemo() {
++  window.location.hash = '#/demo';
++  return render(renderApp());
++}
++
++function openResetDialog() {
++  const trigger = screen.getByRole('button', { name: 'ล้างข้อมูล Demo' });
++  trigger.focus();
++  fireEvent.click(trigger);
++  return {
++    trigger,
++    dialog: screen.getByRole('alertdialog', { name: 'ยืนยันการล้างข้อมูล Demo' }),
++  };
++}
++
++beforeEach(() => {
++  vi.spyOn(window, 'confirm').mockReturnValue(false);
++  window.localStorage.clear();
++  window.sessionStorage.clear();
++  window.localStorage.setItem(DEMO_USERS_KEY, JSON.stringify([demoUser]));
++  window.sessionStorage.setItem(
++    DEMO_SESSION_KEY,
++    JSON.stringify({
++      id: demoUser.id,
++      name: demoUser.name,
++      email: demoUser.email,
++      createdAt: demoUser.createdAt,
++    }),
++  );
++  window.location.hash = '#/demo';
++});
++
++describe('Accessibility contract', () => {
++  it('gives landmarks, interactive controls, and Demo form fields accessible names', () => {
++    window.localStorage.removeItem(DEMO_USERS_KEY);
++    window.sessionStorage.removeItem(DEMO_SESSION_KEY);
++    renderDemo();
++
++    expect(screen.getAllByRole('main')).toHaveLength(1);
++    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
++    expect(screen.getByRole('navigation', { name: 'นำทางหลัก' })).toBeVisible();
++    expect(screen.getByRole('link', { name: 'ข้ามไปยังเนื้อหา' })).toBeVisible();
++    expect(screen.getByLabelText('ชื่อที่แสดง')).toBeVisible();
++    expect(screen.getByLabelText('อีเมล')).toBeVisible();
++    expect(screen.getByLabelText('รหัสผ่าน')).toBeVisible();
++
++    for (const control of [
++      ...screen.getAllByRole('button'),
++      ...screen.getAllByRole('link'),
++    ]) {
++      expect(control).toHaveAccessibleName();
++    }
++  });
++
++  it('names every diploma course-map link by the lesson it opens', () => {
++    window.location.hash = '#/';
++    render(renderApp());
++
++    fireEvent.click(screen.getByRole('button', { name: 'ปวส.' }));
++
++    for (const lesson of getLessonsForLevel('diploma')) {
++      expect(
++        screen.getByRole('link', { name: `เปิดบทเรียน ${lesson.title}` }),
++      ).toBeVisible();
++    }
++  });
++
++  it('announces the selected CodeExplorer line and explanation through a polite live region', () => {
++    render(<CodeExplorer snippet={snippet} />);
++    const detail = screen.getByRole('complementary', { name: 'รายละเอียดบรรทัด' });
++    const liveRegion = detail.querySelector('[aria-live="polite"]');
++
++    expect(liveRegion).toHaveAttribute('aria-atomic', 'true');
++    fireEvent.click(screen.getByRole('button', { name: 'บรรทัด 2' }));
++
++    expect(liveRegion).toHaveTextContent('บรรทัด 2');
++    expect(liveRegion).toHaveTextContent(snippet.notes[1]);
++    expect(within(detail).getByRole('heading', { name: 'บรรทัด 2' })).toBeVisible();
++  });
++
++  it('opens an accessible reset dialog, moves focus inside, and closes without deletion on Escape', () => {
++    renderDemo();
++    const { trigger, dialog } = openResetDialog();
++    const cancelButton = within(dialog).getByRole('button', {
++      name: 'ยกเลิกการล้างข้อมูล',
++    });
++
++    expect(dialog).toHaveAttribute('aria-modal', 'true');
++    expect(window.confirm).not.toHaveBeenCalled();
++    expect(dialog).toHaveAccessibleDescription(
++      'ลบผู้ใช้ทดสอบทั้งหมดและ session ปัจจุบันจากเบราว์เซอร์นี้หรือไม่?',
++    );
++    expect(cancelButton).toHaveFocus();
++
++    const cancelEvent = new Event('cancel', { bubbles: true, cancelable: true });
++    fireEvent(dialog, cancelEvent);
++
++    expect(cancelEvent.defaultPrevented).toBe(true);
++    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
++    expect(trigger).toHaveFocus();
++    expect(window.localStorage.getItem(DEMO_USERS_KEY)).not.toBeNull();
++    expect(window.sessionStorage.getItem(DEMO_SESSION_KEY)).not.toBeNull();
++    expect(screen.getByRole('heading', { name: 'ทดลองใช้งานสำเร็จ' })).toBeVisible();
++  });
++
++  it('keeps Demo data when reset is cancelled and deletes it only after confirmation', () => {
++    renderDemo();
++    const { trigger, dialog } = openResetDialog();
++
++    fireEvent.click(within(dialog).getByRole('button', { name: 'ยกเลิกการล้างข้อมูล' }));
++
++    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
++    expect(trigger).toHaveFocus();
++    expect(window.localStorage.getItem(DEMO_USERS_KEY)).not.toBeNull();
++    expect(window.sessionStorage.getItem(DEMO_SESSION_KEY)).not.toBeNull();
++
++    const confirmed = openResetDialog();
++    fireEvent.click(
++      within(confirmed.dialog).getByRole('button', { name: 'ยืนยันการล้างข้อมูล' }),
++    );
++
++    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
++    expect(window.localStorage.getItem(DEMO_USERS_KEY)).toBeNull();
++    expect(window.sessionStorage.getItem(DEMO_SESSION_KEY)).toBeNull();
++    expect(screen.getByRole('button', { name: 'สร้างบัญชี Demo' })).toBeVisible();
++    expect(screen.getByRole('status')).toHaveTextContent('ล้างข้อมูล Demo แล้ว');
++  });
++});
+diff --git a/src/test/setup.ts b/src/test/setup.ts
+index 159e89e..1ea1416 100644
+--- a/src/test/setup.ts
++++ b/src/test/setup.ts
+@@ -1,12 +1,30 @@
+ import '@testing-library/jest-dom/vitest';
+ import { cleanup } from '@testing-library/react';
+ import { afterEach, beforeEach, vi } from 'vitest';
+ 
++if (!HTMLDialogElement.prototype.showModal) {
++  Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
++    configurable: true,
++    value: function (this: HTMLDialogElement) {
++      this.open = true;
++    },
++  });
++}
++
++if (!HTMLDialogElement.prototype.close) {
++  Object.defineProperty(HTMLDialogElement.prototype, 'close', {
++    configurable: true,
++    value: function (this: HTMLDialogElement) {
++      this.open = false;
++    },
++  });
++}
++
+ beforeEach(() => {
+   vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+ });
+ 
+ afterEach(() => {
+   cleanup();
+   vi.restoreAllMocks();
+ });
+diff --git a/public/favicon.svg b/public/favicon.svg
+new file mode 100644
+index 0000000..318b287
+--- /dev/null
++++ b/public/favicon.svg
+@@ -0,0 +1,7 @@
++<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
++  <title id="title">AuthLab</title>
++  <rect width="64" height="64" rx="16" fill="#4f46e5" />
++  <path d="M17 17h16c5 0 9 4 9 9v23H26c-5 0-9-4-9-9V17Z" fill="none" stroke="#fff" stroke-width="4" stroke-linejoin="round" />
++  <path d="M42 22h5c5 0 9 4 9 9v18c0 5-4 9-9 9h-5" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" />
++  <path d="M25 27h10M25 35h7" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" />
++</svg>
+diff --git a/src/test/indexDocument.test.ts b/src/test/indexDocument.test.ts
+new file mode 100644
+index 0000000..8539b16
+--- /dev/null
++++ b/src/test/indexDocument.test.ts
+@@ -0,0 +1,12 @@
++import { existsSync, readFileSync } from 'node:fs';
++import { resolve } from 'node:path';
++import { describe, expect, it } from 'vitest';
++
++describe('Application document', () => {
++  it('declares a local favicon that exists', () => {
++    const html = readFileSync(resolve('index.html'), 'utf8');
++
++    expect(html).toContain('<link rel="icon" href="/favicon.svg" />');
++    expect(existsSync(resolve('public/favicon.svg'))).toBe(true);
++  });
++});

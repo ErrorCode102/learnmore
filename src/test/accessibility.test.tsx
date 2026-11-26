@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../App';
 import { CodeExplorer } from '../components/CodeExplorer';
+import { getLessonsForLevel } from '../data/course';
 import {
   DEMO_SESSION_KEY,
   DEMO_USERS_KEY,
@@ -82,6 +83,19 @@ describe('Accessibility contract', () => {
       ...screen.getAllByRole('link'),
     ]) {
       expect(control).toHaveAccessibleName();
+    }
+  });
+
+  it('names every diploma course-map link by the lesson it opens', () => {
+    window.location.hash = '#/';
+    render(renderApp());
+
+    fireEvent.click(screen.getByRole('button', { name: 'ปวส.' }));
+
+    for (const lesson of getLessonsForLevel('diploma')) {
+      expect(
+        screen.getByRole('link', { name: `เปิดบทเรียน ${lesson.title}` }),
+      ).toBeVisible();
     }
   });
 

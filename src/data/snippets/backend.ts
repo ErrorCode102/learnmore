@@ -83,7 +83,7 @@ export const passwordPolicyMessage =
 
 export async function findByEmail(email) {
   const [rows] = await pool.execute(
-    'SELECT id, email, password_hash FROM users WHERE email = ? LIMIT 1',
+    'SELECT id, email, password_hash, created_at FROM users WHERE email = ? LIMIT 1',
     [email],
   );
   return rows[0] ?? null;
@@ -103,13 +103,17 @@ export async function createUser(email, passwordHash) {
     [email, passwordHash],
   );
   return result.insertId;
+}
+
+export async function deleteUserById(id) {
+  await pool.execute('DELETE FROM users WHERE id = ?', [id]);
 }`,
     [
       'นำเข้า pool จากโมดูล database เพื่อให้ model เป็นผู้มีหน้าที่เรียก SQL ของผู้ใช้',
       'เว้นบรรทัดก่อนฟังก์ชันเพื่อแยก dependency ออกจากนิยามฟังก์ชัน',
       'ประกาศฟังก์ชันค้นหาผู้ใช้จาก email สำหรับขั้นตอน Register และ Login',
       'เปิด pool.execute ที่คืน promise และ destructure ชุดแถวจากผลลัพธ์',
-      'ส่ง SELECT แบบ parameterized เพื่อไม่แถบ input ลงใน SQL string',
+      'ส่ง SELECT แบบ parameterized โดยเลือก identity fields, password_hash สำหรับ Login และ created_at สำหรับ response',
       'ส่ง email เป็นค่า parameter ที่ mysql2 escape และ quote ให้อย่างปลอดภัย',
       'ปิด pool.execute พร้อมส่ง argument ทั้ง query และค่า parameter',
       'คืนผู้ใช้แรกหรือ null เมื่อไม่พบแถวที่ตรงกัน',
@@ -130,8 +134,12 @@ export async function createUser(email, passwordHash) {
       'ปิด pool.execute สำหรับ INSERT แล้วเก็บ result ไว้อ่าน insertId',
       'อ่าน insertId ที่ MySQL สร้างจาก AUTO_INCREMENT',
       'คืน id ของผู้ใช้ใหม่เพื่อ controller ใส่ไว้ใน JWT และ response และปิดฟังก์ชัน',
+      'เว้นบรรทัดแยกการสร้างผู้ใช้ออกจากฟังก์ชัน cleanup',
+      'ประกาศฟังก์ชันลบผู้ใช้ตาม id สำหรับชดเชยเมื่อ Register สร้างข้อมูลแล้วแต่ออก refresh token ไม่สำเร็จ',
+      'ส่ง DELETE แบบ parameterized เพื่อลบเฉพาะผู้ใช้ที่ request นี้สร้าง',
+      'foreign key จะลบ refresh records ที่ผูกกับผู้ใช้ที่ถูกลบโดยอัตโนมัติ',
     ],
-    'Model ไม่รับ plaintext password และไม่ส่ง hash กลับไปที่ Frontend',
+    'Model ไม่รับ plaintext password และไม่ส่ง hash กลับไปที่ Frontend; deleteUserById ใช้ cleanup เมื่อ initial refresh issuance ล้มเหลว',
   ),
   defineSnippet(
     'backend-auth-validation',

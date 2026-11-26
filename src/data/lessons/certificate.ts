@@ -177,21 +177,21 @@ const coreBlueprints: Record<CoreLessonId, CoreBlueprint> = {
         id: 'install-runtime-tools',
         title: 'ติดตั้ง Node.js, npm และ Editors',
         body: [
-          'ดาวน์โหลด Node.js LTS ปัจจุบันจาก https://nodejs.org/en/download แล้วตรวจให้เวอร์ชันไม่ต่ำกว่า reference floor 18 และแนะนำ current LTS เพราะ security fixes npm มาพร้อม Node.js จึงไม่ต้องติดตั้งแยก',
+          'ดาวน์โหลด Node.js LTS ปัจจุบันจาก https://nodejs.org/en/download แล้วใช้ Node.js 20.19.0 ขึ้นไปในสาย 20 หรือ 22.12.0 ขึ้นไป เพราะ Vite 7 ที่ใช้สร้าง Frontend รองรับเวอร์ชันเหล่านี้ npm มาพร้อม Node.js จึงไม่ต้องติดตั้งแยก',
           'ติดตั้ง VS Code จาก https://code.visualstudio.com/ พร้อม extensions สำหรับ Vue, ESLint และ Git; Git จาก https://git-scm.com/downloads ใช้ตรวจสถานะไฟล์และ push source โดยไม่มี .env หรือ node_modules',
         ],
         bullets: ['เปิด Windows Terminal และใช้ Git Bash เมื่อต้องการรัน shell scripts', 'ตรวจ node --version, npm --version, git --version และ code --version', 'บันทึกเวอร์ชันที่ใช้เพื่อให้ทีมอื่น reproduce environment ได้'],
-        callouts: [{ tone: 'info', title: 'ข้อกำหนดเครื่องมือ', text: 'Node.js 18 เป็น reference floor ของ workshop แต่แนะนำ current LTS; ตัวอย่างโค้ดใช้ API ที่มีใน Node.js รุ่นปัจจุบัน' }],
+        callouts: [{ tone: 'info', title: 'ข้อกำหนดเครื่องมือ', text: 'ใช้ Node.js 20.19.0 ขึ้นไปในสาย 20 หรือ 22.12.0 ขึ้นไป; Node.js 18 ไม่รองรับ Vite 7 ใน workshop นี้' }],
       },
       {
         id: 'verify-node-git',
         title: 'ตรวจสอบ Runtime และ Git ก่อนใช้งาน',
         body: [
-          'พิมพ์คำสั่งตรวจสอบทีละบรรทัดใน Windows Terminal ผลลัพธ์ของ node ควรขึ้นเวอร์ชัน LTS และ npm ควรเป็นเลขเวอร์ชัน หาก where node ไม่พบ executable ให้ตรวจ PATH หรือเปิด Terminal ใหม่หลังติดตั้ง',
+          'พิมพ์คำสั่งตรวจสอบทีละบรรทัดใน Windows Terminal ผลลัพธ์ของ node ควรเป็น 20.19.0 ขึ้นไปในสาย 20 หรือ 22.12.0 ขึ้นไป และ npm ควรเป็นเลขเวอร์ชัน หาก where node ไม่พบ executable ให้ตรวจ PATH หรือเปิด Terminal ใหม่หลังติดตั้ง',
           'Git ใช้ตรวจว่าไฟล์ secrets ไม่ติดตาม และ VS Code CLI ใช้เปิด root auth-lab ได้สะดวก คำสั่งเหล่านี้ไม่แก้ไขระบบ ยกเว้นการอ่านข้อมูลเวอร์ชันและตำแหน่งโปรแกรม',
         ],
         snippets: [installationSnippets[0]],
-        callouts: [{ tone: 'success', title: 'ผลลัพธ์ที่คาดหวัง', text: 'Node.js แสดง v18 ขึ้นไป (แนะนำ LTS ปัจจุบัน), npm แสดงเลขเวอร์ชัน และ Git/VS Code แสดงเวอร์ชันได้' }],
+        callouts: [{ tone: 'success', title: 'ผลลัพธ์ที่คาดหวัง', text: 'Node.js แสดง v20.19.0 ขึ้นไปในสาย 20 หรือ v22.12.0 ขึ้นไป, npm แสดงเลขเวอร์ชัน และ Git/VS Code แสดงเวอร์ชันได้' }],
       },
       {
         id: 'install-mysql-heidi',
@@ -207,7 +207,7 @@ const coreBlueprints: Record<CoreLessonId, CoreBlueprint> = {
     ],
     checkpoint: {
       summary: 'ยืนยันว่ารันเครื่องมือบน Windows Terminal และเชื่อม MySQL ด้วย HeidiSQL ได้จริงก่อนเริ่มสร้าง AuthLab',
-      checklist: ['ระบุเวอร์ชัน Node.js และยืนยันว่าตรงตาม reference floor', 'แสดงผล node --version และ npm --version ได้', 'เชื่อม MySQL/MariaDB ด้วย HeidiSQL และรัน SELECT VERSION()', 'ตรวจ charset/collation และเปิดโปรเจกต์ใน VS Code ด้วย Git ได้'],
+      checklist: ['ระบุเวอร์ชัน Node.js และยืนยันว่าเป็น 20.19.0 ขึ้นไปในสาย 20 หรือ 22.12.0 ขึ้นไป', 'แสดงผล node --version และ npm --version ได้', 'เชื่อม MySQL/MariaDB ด้วย HeidiSQL และรัน SELECT VERSION()', 'ตรวจ charset/collation และเปิดโปรเจกต์ใน VS Code ด้วย Git ได้'],
     },
   },
   setup: {
@@ -218,7 +218,7 @@ const coreBlueprints: Record<CoreLessonId, CoreBlueprint> = {
         id: 'scaffold-project',
         title: 'สร้าง Backend และ Vue Frontend',
         body: [
-          'เลือก Git Bash ใน Windows Terminal แล้วสร้าง root ชื่อ auth-lab แยก Backend/Frontend ชัดเจน Backend ใช้ npm init และ ESM ขณะที่ Frontend ใช้ npm create vite@latest auth-frontend -- --template vue-ts จากนั้นติดตั้ง Axios, Pinia และ Tailwind CSS',
+          'เลือก Git Bash ใน Windows Terminal แล้วสร้าง root ชื่อ auth-lab แยก Backend/Frontend ชัดเจน ต้องใช้ Node.js 20.19.0 ขึ้นไปในสาย 20 หรือ 22.12.0 ขึ้นไปก่อนรัน Vite 7 Backend ใช้ npm init และ ESM ขณะที่ Frontend ใช้ npm create vite@latest auth-frontend -- --template vue-ts จากนั้นติดตั้ง Axios, Pinia และ Tailwind CSS',
           ' dependency ของ Backend ครอบคลุม Express, mysql2, bcryptjs, jsonwebtoken, cors, dotenv, express-validator, helmet และ express-rate-limit ส่วน nodemon เป็น development dependency เท่านั้น',
         ],
         snippets: [setupSnippets[0], setupSnippets[1]],

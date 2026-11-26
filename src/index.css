@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@source not "../dist";
+
 @theme inline {
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);
@@ -127,6 +129,63 @@ a {
   box-shadow:
     0 28px 80px -34px rgb(23 34 59 / 0.3),
     0 3px 12px rgb(23 34 59 / 0.04);
+}
+
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: #94a3b8;
+}
+
+.token.punctuation {
+  color: #cbd5e1;
+}
+
+.token.keyword,
+.token.selector,
+.token.important {
+  color: #c4b5fd;
+}
+
+.token.string,
+.token.char,
+.token.attr-value,
+.token.regex {
+  color: #86efac;
+}
+
+.token.number,
+.token.boolean,
+.token.constant,
+.token.symbol {
+  color: #fdba74;
+}
+
+.token.operator,
+.token.entity,
+.token.url {
+  color: #f9a8d4;
+}
+
+.token.function,
+.token.class-name {
+  color: #93c5fd;
+}
+
+.token.property,
+.token.tag,
+.token.attr-name,
+.token.builtin {
+  color: #a5f3fc;
+}
+
+.token.deleted {
+  color: #fca5a5;
+}
+
+.token.inserted {
+  color: #bef264;
 }
 
 @media (prefers-reduced-motion: reduce) {

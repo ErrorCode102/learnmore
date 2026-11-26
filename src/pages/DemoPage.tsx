@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type SyntheticEvent } from 'react';
 import {
   ArrowRight,
   CircleAlert,
@@ -34,6 +34,25 @@ export function DemoPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [session, setSession] = useState<DemoSession | null>(() => readSession());
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const resetDialogRef = useRef<HTMLDialogElement>(null);
+  const resetTriggerRef = useRef<HTMLButtonElement>(null);
+  const resetCancelRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const dialog = resetDialogRef.current;
+    if (!dialog) {
+      return;
+    }
+
+    if (isResetDialogOpen) {
+      dialog.showModal();
+      resetCancelRef.current?.focus();
+    } else if (dialog.open) {
+      dialog.close();
+      resetTriggerRef.current?.focus();
+    }
+  }, [isResetDialogOpen]);
 
   function switchMode(nextMode: DemoMode) {
     setMode(nextMode);
@@ -82,13 +101,17 @@ export function DemoPage() {
     setSuccess('ออกจากระบบแล้ว ผู้ใช้ Demo ยังคงอยู่สำหรับการเข้าสู่ระบบครั้งถัดไป');
   }
 
-  function handleReset() {
-    const confirmed = window.confirm(
-      'ลบผู้ใช้ทดสอบทั้งหมดและ session ปัจจุบันจากเบราว์เซอร์นี้หรือไม่?',
-    );
-    if (!confirmed) {
-      return;
-    }
+  function closeResetDialog() {
+    setIsResetDialogOpen(false);
+  }
+
+  function handleResetCancel(event: SyntheticEvent<HTMLDialogElement>) {
+    event.preventDefault();
+    closeResetDialog();
+  }
+
+  function confirmReset() {
+    closeResetDialog();
 
     try {
       resetDemoData();
@@ -170,8 +193,9 @@ export function DemoPage() {
                 ออกจากระบบ
               </button>
               <button
+                ref={resetTriggerRef}
                 type="button"
-                onClick={handleReset}
+                onClick={() => setIsResetDialogOpen(true)}
                 className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-line bg-surface px-5 py-3 text-sm font-semibold text-ink transition-colors hover:border-coral/40 hover:text-coral"
               >
                 <Trash2 aria-hidden="true" className="h-4 w-4" />
@@ -342,6 +366,42 @@ export function DemoPage() {
           </aside>
         </div>
       )}
+
+      <dialog
+        ref={resetDialogRef}
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="reset-demo-title"
+        aria-describedby="reset-demo-description"
+        onCancel={handleResetCancel}
+        className="m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl border border-line bg-surface p-0 text-ink shadow-2xl backdrop:bg-inverse/60"
+      >
+        <div className="p-6 sm:p-7">
+          <h2 id="reset-demo-title" className="text-xl font-semibold tracking-[-0.025em]">
+            ยืนยันการล้างข้อมูล Demo
+          </h2>
+          <p id="reset-demo-description" className="mt-3 text-sm leading-7 text-muted">
+            ลบผู้ใช้ทดสอบทั้งหมดและ session ปัจจุบันจากเบราว์เซอร์นี้หรือไม่?
+          </p>
+          <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <button
+              ref={resetCancelRef}
+              type="button"
+              onClick={closeResetDialog}
+              className="inline-flex min-h-12 items-center justify-center rounded-xl border border-line bg-surface px-5 py-3 text-sm font-semibold text-ink transition-colors hover:bg-canvas"
+            >
+              ยกเลิกการล้างข้อมูล
+            </button>
+            <button
+              type="button"
+              onClick={confirmReset}
+              className="inline-flex min-h-12 items-center justify-center rounded-xl bg-danger px-5 py-3 text-sm font-semibold text-surface transition-opacity hover:opacity-90"
+            >
+              ยืนยันการล้างข้อมูล
+            </button>
+          </div>
+        </div>
+      </dialog>
     </div>
   );
 }

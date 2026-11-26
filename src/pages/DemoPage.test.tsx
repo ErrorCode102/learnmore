@@ -1,6 +1,6 @@
 /// <reference types="node" />
 import { webcrypto } from 'node:crypto';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../App';
 import themeCss from '../index.css?raw';
@@ -45,7 +45,6 @@ beforeEach(() => {
   window.sessionStorage.clear();
   originalLocks = Object.getOwnPropertyDescriptor(navigator, 'locks');
   installWebLocks();
-  vi.spyOn(window, 'confirm').mockReturnValue(true);
 });
 
 afterEach(() => {
@@ -176,7 +175,10 @@ describe('Authentication Demo page', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'ล้างข้อมูล Demo' }));
 
-    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('ลบผู้ใช้ทดสอบทั้งหมด'));
+    const dialog = screen.getByRole('alertdialog', { name: 'ยืนยันการล้างข้อมูล Demo' });
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'ยืนยันการล้างข้อมูล' }),
+    );
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'ทดลองใช้งานสำเร็จ' })).not.toBeInTheDocument());
     expect(window.localStorage.getItem(USERS_KEY)).toBeNull();
     expect(window.sessionStorage.getItem(SESSION_KEY)).toBeNull();
@@ -185,11 +187,12 @@ describe('Authentication Demo page', () => {
 
   it('keeps cancelled reset data intact', async () => {
     await registerUser(account);
-    vi.mocked(window.confirm).mockReturnValue(false);
     renderDemo();
     await screen.findByRole('heading', { name: 'ทดลองใช้งานสำเร็จ' });
 
     fireEvent.click(screen.getByRole('button', { name: 'ล้างข้อมูล Demo' }));
+    const dialog = screen.getByRole('alertdialog', { name: 'ยืนยันการล้างข้อมูล Demo' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'ยกเลิกการล้างข้อมูล' }));
 
     expect(window.localStorage.getItem(USERS_KEY)).not.toBeNull();
     expect(screen.getByRole('heading', { name: 'ทดลองใช้งานสำเร็จ' })).toBeVisible();
@@ -211,6 +214,10 @@ describe('Authentication Demo page', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'ล้างข้อมูล Demo' }));
+    const dialog = screen.getByRole('alertdialog', { name: 'ยืนยันการล้างข้อมูล Demo' });
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'ยืนยันการล้างข้อมูล' }),
+    );
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'ไม่สามารถล้างข้อมูล Demo ในเบราว์เซอร์นี้ได้',
